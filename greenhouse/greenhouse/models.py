@@ -2,9 +2,9 @@ from pydantic import BaseModel
 from openenv.core.env_server import Action, Observation, State
 
 class GreenhouseAction(Action, BaseModel):
-    water_amount: int     # 0 to 10
-    heater_power: int     # 0 to 5
-    buy_fertilizer: bool  # True/False
+    water_amount: int
+    heater_power: int
+    buy_fertilizer: bool
 
 class GreenhouseObservation(Observation, BaseModel):
     day: int

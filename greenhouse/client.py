@@ -1,99 +1,18 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
+from openenv.core.http_env_client import HTTPEnvClient
+from .models import GreenhouseAction, GreenhouseObservation, GreenhouseState
 
-"""Greenhouse Environment Client."""
-
-from typing import Dict
-
-from openenv.core import EnvClient
-from openenv.core.client_types import StepResult
-from openenv.core.env_server.types import State
-
-from .models import GreenhouseAction, GreenhouseObservation
-
-
-class GreenhouseEnv(
-    EnvClient[GreenhouseAction, GreenhouseObservation, State]
-):
-    """
-    Client for the Greenhouse Environment.
-
-    This client maintains a persistent WebSocket connection to the environment server,
-    enabling efficient multi-step interactions with lower latency.
-    Each client instance has its own dedicated environment session on the server.
-
-    Example:
-        >>> # Connect to a running server
-        >>> with GreenhouseEnv(base_url="http://localhost:8000") as client:
-        ...     result = client.reset()
-        ...     print(result.observation.echoed_message)
-        ...
-        ...     result = client.step(GreenhouseAction(message="Hello!"))
-        ...     print(result.observation.echoed_message)
-
-    Example with Docker:
-        >>> # Automatically start container and connect
-        >>> client = GreenhouseEnv.from_docker_image("greenhouse-env:latest")
-        >>> try:
-        ...     result = client.reset()
-        ...     result = client.step(GreenhouseAction(message="Test"))
-        ... finally:
-        ...     client.close()
-    """
-
-    def _step_payload(self, action: GreenhouseAction) -> Dict:
-        """
-        Convert GreenhouseAction to JSON payload for step message.
-
-        Args:
-            action: GreenhouseAction instance
-
-        Returns:
-            Dictionary representation suitable for JSON encoding
-        """
+class GreenhouseClient(HTTPEnvClient[GreenhouseAction, GreenhouseObservation]):
+    
+    def _step_payload(self, action: GreenhouseAction) -> dict:
+        """Packages the Python action into a JSON dictionary."""
         return {
-            "message": action.message,
+            "water_amount": action.water_amount,
+            "heater_power": action.heater_power,
+            "buy_fertilizer": action.buy_fertilizer
         }
 
-    def _parse_result(self, payload: Dict) -> StepResult[GreenhouseObservation]:
-        """
-        Parse server response into StepResult[GreenhouseObservation].
-
-        Args:
-            payload: JSON response data from server
-
-        Returns:
-            StepResult with GreenhouseObservation
-        """
-        obs_data = payload.get("observation", {})
-        observation = GreenhouseObservation(
-            echoed_message=obs_data.get("echoed_message", ""),
-            message_length=obs_data.get("message_length", 0),
-            done=payload.get("done", False),
-            reward=payload.get("reward"),
-            metadata=obs_data.get("metadata", {}),
-        )
-
-        return StepResult(
-            observation=observation,
-            reward=payload.get("reward"),
-            done=payload.get("done", False),
-        )
-
-    def _parse_state(self, payload: Dict) -> State:
-        """
-        Parse server response into State object.
-
-        Args:
-            payload: JSON response from state request
-
-        Returns:
-            State object with episode_id and step_count
-        """
-        return State(
-            episode_id=payload.get("episode_id"),
-            step_count=payload.get("step_count", 0),
-        )
+    def _parse_result(self, payload: dict) -> tuple[GreenhouseObservation, float, bool]:
+        """Unpackages the JSON response from the server back into Python objects."""
+        obs_data = payload['observation']
+        obs = GreenhouseObservation(**obs_data)
+        return obs, payload['reward'], payload['done']
