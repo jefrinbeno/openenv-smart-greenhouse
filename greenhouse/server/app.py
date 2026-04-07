@@ -1,46 +1,45 @@
+import uvicorn
+from fastapi import FastAPI
 import gradio as gr
-from greenhouse.client import GreenhouseClient
+from greenhouse.server.greenhouse_environment import GreenhouseEnvironment
 from greenhouse.models import GreenhouseAction
 
-# Initialize the client (talks to your local or deployed server)
-client = GreenhouseClient()
+# 1. Initialize the FastAPI Backend
+app = FastAPI(title="Smart Greenhouse Pro")
+env = GreenhouseEnvironment()
 
-def update_greenhouse(water, heat, fertilizer):
-    # 1. Create the action object
-    action = GreenhouseAction(
-        water_amount=water, 
-        heater_power=heat, 
-        buy_fertilizer=fertilizer
-    )
-    
-    # 2. Send to the simulation
-    obs, reward, done = client.step(action)
-    
-    # 3. Return the results for the UI
-    status = "✅ Healthy" if reward > 0 else "⚠️ Stress Detected"
+@app.post("/step")
+async def step(action: GreenhouseAction):
+    obs, reward, done = env.step(action)
+    return {"observation": obs, "reward": reward, "done": done}
+
+@app.post("/reset")
+async def reset():
+    obs = env.reset()
+    return {"observation": obs}
+
+# 2. Initialize the Gradio Frontend
+def ui_step(water, heat, fertilizer):
+    action = GreenhouseAction(water_amount=water, heater_power=heat, buy_fertilizer=fertilizer)
+    obs, reward, done = env.step(action)
+    status = "✅ Healthy" if reward > 0 else "⚠️ Stress"
     return f"{obs.temp}°C", f"{obs.moisture}%", status, f"Score: {reward}"
 
-# Build the Interface
-with gr.Blocks(title="Smart Greenhouse Control") as demo:
+with gr.Blocks() as demo:
     gr.Markdown("# 🌿 Smart Greenhouse Dashboard")
-    
     with gr.Row():
-        temp_out = gr.Label(label="Current Temp")
-        moist_out = gr.Label(label="Current Moisture")
-    
+        t_out = gr.Label(label="Temp")
+        m_out = gr.Label(label="Moisture")
     with gr.Row():
-        water_ctrl = gr.Slider(0, 1, label="Water Pump", value=0.1)
-        heat_ctrl = gr.Slider(0, 1, label="Heater Power", value=0.2)
-        fert_ctrl = gr.Checkbox(label="Apply Fertilizer")
-        
+        w = gr.Slider(0, 1, label="Water", value=0.1)
+        h = gr.Slider(0, 1, label="Heat", value=0.2)
+        f = gr.Checkbox(label="Fertilizer")
     btn = gr.Button("Submit Step")
-    
-    msg = gr.Textbox(label="System Status")
-    reward_msg = gr.Textbox(label="RL Reward Signal")
+    btn.click(ui_step, inputs=[w, h, f], outputs=[t_out, m_out, gr.Textbox(), gr.Textbox()])
 
-    btn.click(update_greenhouse, 
-              inputs=[water_ctrl, heat_ctrl, fert_ctrl], 
-              outputs=[temp_out, moist_out, msg, reward_msg])
+# 3. Mount Gradio onto FastAPI
+app = gr.mount_gradio_app(app, demo, path="/")
 
 if __name__ == "__main__":
-    demo.launch()
+    # Port 7860 is the Hugging Face standard
+    uvicorn.run(app, host="0.0.0.0", port=7860)
