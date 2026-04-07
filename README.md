@@ -1,4 +1,3 @@
-
 ---
 title: Smart Greenhouse Enterprise
 emoji: 🌿
@@ -18,10 +17,10 @@ An industrial-grade digital twin simulation and monitoring dashboard designed fo
 The project follows a modular, decoupled architecture to ensure scalability and ease of integration with external RL agents.
 
 ### 📦 Component Breakdown
-* **Physics Engine (`greenhouse/core/physics.py`):** Simulates real-world thermodynamic and hydration variables using differential equations.
-* **Economic Logic (`greenhouse/core/rewards.py`):** Calculates reward signals based on plant health, resource consumption, and nutrient efficiency.
-* **Environment Wrapper (`greenhouse/server/greenhouse_environment.py`):** An OpenAI Gym-style interface that manages state transitions.
-* **API Layer (FastAPI):** Exposes `/step` and `/reset` endpoints for remote headless control.
+* **Physics Engine (`greenhouse/core/physics.py`):** Simulates real-world thermodynamic and hydration variables.
+* **Economic Logic (`greenhouse/core/rewards.py`):** Calculates reward signals based on plant health and resource consumption.
+* **Environment Wrapper (`greenhouse/server/greenhouse_environment.py`):** An OpenAI Gym-style interface for state transitions.
+* **API Layer (FastAPI):** Exposes `/step` and `/reset` endpoints for remote AI control.
 * **Enterprise Dashboard (Gradio):** A high-fidelity UI for manual intervention and visual analytics.
 
 ---
@@ -72,38 +71,3 @@ A comprehensive, scrollable data table tracks every interaction, providing a his
 ├── Dockerfile               # Container Configuration
 ├── requirements.txt         # Dependency Manifest
 └── README.md                # Project Documentation
-```
-
----
-
-## 🐳 Docker Deployment
-
-The system is optimized for containerized environments. The Dockerfile uses a multi-stage build philosophy:
-
-```dockerfile
-FROM python:3.12
-WORKDIR /code
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY . .
-ENV PYTHONPATH=/code
-CMD ["python", "-m", "greenhouse.server.app"]
-```
-
----
-
-**Project:** Smart Greenhouse Digital Twin v4.1
-```
-
----
-
-### 🚀 Execution Commands
-
-Run these to push the fix and clear the configuration error:
-
-```bash
-cd /workspaces/openenv-smart-greenhouse
-git add README.md
-git commit -m "Fix: Added required Hugging Face YAML metadata to README"
-git push origin main
-```
