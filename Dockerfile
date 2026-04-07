@@ -1,18 +1,14 @@
 FROM python:3.12
 
-# 1. Set the working directory
 WORKDIR /code
 
-# 2. Copy the requirements first (for faster caching)
+# 1. Install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 3. Copy EVERYTHING from your current folder into /code
-# This includes the greenhouse folder and app.py
+# 2. Copy the entire project structure
 COPY . .
 
-# 4. Ensure app.py has the right permissions
-RUN chmod +x app.py
-
-# 5. Run the app
-CMD ["python", "app.py"]
+# 3. Check if app.py is in the root or in the greenhouse folder
+# If it's in greenhouse/server/app.py, we run it from there
+CMD ["python", "greenhouse/server/app.py"]
