@@ -3,4 +3,5 @@ uvicorn
 pydantic
 gradio
 requests
+pandas
 openenv==0.1.13
