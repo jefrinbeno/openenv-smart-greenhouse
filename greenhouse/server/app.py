@@ -23,7 +23,7 @@ async def reset():
     obs = env.reset()
     return {"observation": obs}
 
-# 2. Enhanced UI Logic
+# 2. UI Logic
 def ui_step(water, heat, fertilizer):
     global step_count
     action = GreenhouseAction(
@@ -35,31 +35,25 @@ def ui_step(water, heat, fertilizer):
     obs, reward, done = env.step(action)
     step_count += 1
     
-    # Update History for Charts
     history["Step"].append(step_count)
     history["Temperature"].append(obs.temp)
     history["Moisture"].append(obs.moisture)
     history["Reward"].append(reward)
     
     df = pd.DataFrame(history)
-    
     status = "✅ Healthy" if reward > 0 else "⚠️ Stress Detected"
-    reward_color = "green" if reward > 0 else "red"
     
     return (
         f"{obs.temp:.2f}°C", 
         f"{obs.moisture:.2f}%", 
         status, 
         f"Score: {reward:.4f}",
-        df # For the charts
+        df 
     )
 
-# 3. Professional Gradio Interface
-with gr.Blocks(theme=gr.themes.Soft(primary_hue="green", secondary_hue="emerald")) as demo:
-    gr.Markdown("""
-    # 🌿 Smart Greenhouse Pro Dashboard
-    ### Real-time Environment Monitoring & RL Control System
-    """)
+# 3. Updated Interface (Removed theme from Blocks and width from LinePlot)
+with gr.Blocks() as demo:
+    gr.Markdown("# 🌿 Smart Greenhouse Pro Dashboard")
     
     with gr.Row():
         with gr.Column(scale=1):
@@ -83,24 +77,20 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="green", secondary_hue="emerald"
         gr.Markdown("### 📈 Environmental Trends")
     
     with gr.Row():
+        # Removed 'width' argument to fix TypeError
         temp_chart = gr.LinePlot(
             label="Climate History",
             x="Step",
             y="Temperature",
-            tooltip=["Step", "Temperature"],
-            width=500,
             title="Temperature (°C)"
         )
         moist_chart = gr.LinePlot(
             label="Hydration History",
             x="Step",
             y="Moisture",
-            tooltip=["Step", "Moisture"],
-            width=500,
             title="Moisture (%)"
         )
 
-    # Wire up the logic
     btn.click(
         ui_step, 
         inputs=[water_ctrl, heat_ctrl, fert_ctrl], 
@@ -109,9 +99,13 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="green", secondary_hue="emerald"
         lambda df: df, inputs=[temp_chart], outputs=[moist_chart]
     )
 
-# 4. Mount and Launch
-app = gr.mount_gradio_app(app, demo, path="/")
+# 4. Mount and Launch (Theme is passed here now)
+app = gr.mount_gradio_app(
+    app, 
+    demo, 
+    path="/", 
+    theme=gr.themes.Soft(primary_hue="green", secondary_hue="emerald")
+)
 
 if __name__ == "__main__":
-    # Standard Hugging Face Port
     uvicorn.run(app, host="0.0.0.0", port=7860)
