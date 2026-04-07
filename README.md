@@ -71,3 +71,43 @@ A comprehensive, scrollable data table tracks every interaction, providing a his
 ├── Dockerfile               # Container Configuration
 ├── requirements.txt         # Dependency Manifest
 └── README.md                # Project Documentation
+```
+
+---
+
+## 🐳 Docker Deployment
+
+The system is optimized for containerized environments. The Dockerfile uses a multi-stage build philosophy:
+
+```dockerfile
+FROM python:3.12
+WORKDIR /code
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+ENV PYTHONPATH=/code
+CMD ["python", "-m", "greenhouse.server.app"]
+```
+
+---
+
+**Project:** Smart Greenhouse Digital Twin v4.1
+```
+
+### 🚀 Execution Commands to Reflect Changes
+
+Run these in your terminal to force the update to GitHub, which will then push the correct configuration to Hugging Face:
+
+```bash
+cd /workspaces/openenv-smart-greenhouse
+
+# 1. Stage the corrected README
+git add README.md
+
+# 2. Commit with the specific fix message
+git commit -m "Fix: Final Hugging Face YAML configuration in README header"
+
+# 3. Push to GitHub
+git push origin main
+```
+
