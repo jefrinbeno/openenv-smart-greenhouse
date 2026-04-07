@@ -1,4 +1,14 @@
 
+
+```markdown
+---
+title: Smart Greenhouse Enterprise
+emoji: 🌿
+colorFrom: slate
+colorTo: emerald
+sdk: docker
+pinned: false
+app_port: 7860
 ---
 
 # Smart Greenhouse Enterprise: Reinforcement Learning Interface
@@ -55,8 +65,6 @@ A comprehensive, scrollable data table tracks every interaction with the system,
 
 ## 📂 Project Structure
 
-Based on the enterprise repository layout:
-
 ```text
 .
 ├── .github/workflows/       # CI/CD Sync Scripts
@@ -79,7 +87,7 @@ To run the simulation locally, ensure you have Python 3.12+ installed:
 
 1.  **Clone the Repository:**
     ```bash
-    git clone https://github.com/jefrinbeno/openenv-smart-greenhouse.git
+    git clone [https://github.com/jefrinbeno/openenv-smart-greenhouse.git](https://github.com/jefrinbeno/openenv-smart-greenhouse.git)
     cd openenv-smart-greenhouse
     ```
 
@@ -93,7 +101,6 @@ To run the simulation locally, ensure you have Python 3.12+ installed:
     export PYTHONPATH=$PYTHONPATH:.
     python greenhouse/server/app.py
     ```
-    *The dashboard will be available at `http://localhost:7860`.*
 
 ---
 
@@ -113,31 +120,24 @@ CMD ["python", "-m", "greenhouse.server.app"]
 
 ---
 
-## 🤖 Reinforcement Learning Integration
-
-External agents can interact with the simulation via standard HTTP POST requests:
-
-* **Endpoint:** `/step`
-* **Payload:**
-    ```json
-    {
-      "water_amount": 0.5,
-      "heater_power": 0.3,
-      "buy_fertilizer": false
-    }
-    ```
-* **Response:** Returns a state observation, reward float, and terminal boolean.
-
----
-
 ## 🛡️ Security & CI/CD
-This project utilizes **GitHub Actions** for Continuous Deployment. On every push to the `main` branch:
-1.  Code is validated and checked.
-2.  The repository is synchronized to Hugging Face Spaces using an encrypted `HF_TOKEN`.
-3.  The Docker image is automatically rebuilt and redeployed to the cloud.
+This project utilizes **GitHub Actions** for Continuous Deployment. On every push to the `main` branch, the repository is synchronized to Hugging Face Spaces using an encrypted `HF_TOKEN`.
 
 ---
- 
-**Project:** Smart Greenhouse Digital Twin v4.1  
+
+**Project:** Smart Greenhouse Digital Twin v4.1
+```
 
 ---
+
+### 🚀 Execution Commands
+
+Run these to push the fix and clear the configuration error:
+
+```bash
+cd /workspaces/openenv-smart-greenhouse
+git add README.md
+git commit -m "Fix: Added required Hugging Face YAML metadata to README"
+git push origin main
+```
+
