@@ -6,9 +6,12 @@ WORKDIR /code
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 2. Copy the entire project structure
+# 2. Copy the entire project
 COPY . .
 
-# 3. Check if app.py is in the root or in the greenhouse folder
-# If it's in greenhouse/server/app.py, we run it from there
-CMD ["python", "greenhouse/server/app.py"]
+# 3. CRITICAL: Tell Python to look in the root folder for imports
+ENV PYTHONPATH=/code
+
+# 4. Run the app using the module flag (-m) 
+# This treats 'greenhouse' as a package correctly
+CMD ["python", "-m", "greenhouse.server.app"]
