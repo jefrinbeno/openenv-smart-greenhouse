@@ -41,15 +41,15 @@ def ui_step(water, heat, fertilizer):
     history["Reward"].append(round(reward, 4))
     
     df = pd.DataFrame(history)
-    status = "✅ Healthy" if reward > 0 else "⚠️ Stress Detected"
+    status = "System Healthy" if reward > 0 else "Stress Detected"
     
     return (
-        f"{obs.temp:.2f}°C", 
-        f"{obs.moisture:.2f}%", 
+        f"{obs.temp:.2f} C", 
+        f"{obs.moisture:.2f} %", 
         status, 
         f"Score: {reward:.4f}",
-        df, # For charts
-        df.tail(10) # For history table (showing last 10 steps)
+        df, 
+        df.tail(10)
     )
 
 def ui_reset():
@@ -57,12 +57,11 @@ def ui_reset():
     obs = env.reset()
     step_count = 0
     history = {"Step": [], "Temperature": [], "Moisture": [], "Reward": []}
-    # Return initial states and empty dataframe
     empty_df = pd.DataFrame(columns=["Step", "Temperature", "Moisture", "Reward"])
     return (
-        f"{obs.temp:.2f}°C", 
-        f"{obs.moisture:.2f}%", 
-        "🔄 System Reset", 
+        f"{obs.temp:.2f} C", 
+        f"{obs.moisture:.2f} %", 
+        "System Reset", 
         "Score: 0.0000", 
         empty_df, 
         empty_df
@@ -70,40 +69,38 @@ def ui_reset():
 
 # 3. Professional Interface Layout
 with gr.Blocks() as demo:
-    gr.Markdown("# 🌿 Smart Greenhouse Pro Dashboard")
+    gr.Markdown("# Smart Greenhouse Pro Dashboard")
     
     with gr.Row():
-        # Left Column: Controls
         with gr.Column(scale=1):
-            gr.Markdown("### 🎛️ Control Panel")
-            water_ctrl = gr.Slider(0, 1, label="💧 Water Pump", value=0.1)
-            heat_ctrl = gr.Slider(0, 1, label="🔥 Heater Power", value=0.2)
-            fert_ctrl = gr.Checkbox(label="💊 Apply Fertilizer", value=False)
+            gr.Markdown("### Control Panel")
+            water_ctrl = gr.Slider(0, 1, label="Water Pump", value=0.1)
+            heat_ctrl = gr.Slider(0, 1, label="Heater Power", value=0.2)
+            fert_ctrl = gr.Checkbox(label="Apply Fertilizer", value=False)
             
             with gr.Row():
                 btn = gr.Button("Submit Step", variant="primary")
                 reset_btn = gr.Button("Reset Simulation", variant="stop")
             
-        # Right Column: Live Data
         with gr.Column(scale=2):
-            gr.Markdown("### 📊 Live Telemetry")
+            gr.Markdown("### Live Telemetry")
             with gr.Row():
-                temp_out = gr.Label(label="Current Temperature")
-                moist_out = gr.Label(label="Current Moisture")
+                temp_out = gr.Label(label="Temperature")
+                moist_out = gr.Label(label="Moisture")
             
             with gr.Row():
                 status_msg = gr.Textbox(label="System Status", interactive=False)
-                reward_msg = gr.Textbox(label="RL Reward Signal", interactive=False)
+                reward_msg = gr.Textbox(label="Reward Signal", interactive=False)
 
     with gr.Tabs():
-        with gr.TabItem("📈 Visual Trends"):
+        with gr.TabItem("Visual Trends"):
             with gr.Row():
+                # Removed 'overlay_point' to fix TypeError
                 temp_chart = gr.LinePlot(
                     label="Climate History",
                     x="Step",
                     y="Temperature",
-                    title="Temperature (°C)",
-                    overlay_point=True,
+                    title="Temperature (C)",
                     tooltip=["Step", "Temperature"]
                 )
                 moist_chart = gr.LinePlot(
@@ -111,18 +108,16 @@ with gr.Blocks() as demo:
                     x="Step",
                     y="Moisture",
                     title="Moisture (%)",
-                    overlay_point=True,
                     tooltip=["Step", "Moisture"]
                 )
         
-        with gr.TabItem("📋 Step Logs"):
-            gr.Markdown("### 🕒 Recent Environmental Data (Last 10 Steps)")
+        with gr.TabItem("Step Logs"):
+            gr.Markdown("### Historical Data (Recent 10 Steps)")
             history_table = gr.DataFrame(
                 headers=["Step", "Temperature", "Moisture", "Reward"],
                 datatype=["number", "number", "number", "number"]
             )
 
-    # Event Handlers
     btn.click(
         ui_step, 
         inputs=[water_ctrl, heat_ctrl, fert_ctrl], 
@@ -138,12 +133,11 @@ with gr.Blocks() as demo:
         lambda df: df, inputs=[temp_chart], outputs=[moist_chart]
     )
 
-# 4. Mount and Launch
 app = gr.mount_gradio_app(
     app, 
     demo, 
     path="/", 
-    theme=gr.themes.Soft(primary_hue="green", secondary_hue="emerald")
+    theme=gr.themes.Soft(primary_hue="slate", secondary_hue="gray")
 )
 
 if __name__ == "__main__":
