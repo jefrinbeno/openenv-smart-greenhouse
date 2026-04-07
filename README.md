@@ -107,5 +107,4 @@ This repository is "Live-Synced." On every `git push` to the `main` branch:
 
 ---
 
-**Project Version:** v4.1 (Stable)
-**Developer:** Jefrin Beno J M
+
