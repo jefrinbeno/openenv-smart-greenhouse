@@ -1,18 +1,24 @@
-from openenv.core.http_env_client import HTTPEnvClient
-from .models import GreenhouseAction, GreenhouseObservation, GreenhouseState
+import requests
+from typing import Tuple
+from .models import GreenhouseAction, GreenhouseObservation
 
-class GreenhouseClient(HTTPEnvClient[GreenhouseAction, GreenhouseObservation]):
-    
-    def _step_payload(self, action: GreenhouseAction) -> dict:
-        """Packages the Python action into a JSON dictionary."""
-        return {
-            "water_amount": action.water_amount,
-            "heater_power": action.heater_power,
-            "buy_fertilizer": action.buy_fertilizer
-        }
+class GreenhouseClient:
+    """
+    Emergency Manual Client: 
+    Bypasses the broken openenv library to get the simulation running.
+    """
+    def __init__(self, server_url: str = "http://localhost:8000"):
+        self.server_url = server_url
 
-    def _parse_result(self, payload: dict) -> tuple[GreenhouseObservation, float, bool]:
-        """Unpackages the JSON response from the server back into Python objects."""
-        obs_data = payload['observation']
-        obs = GreenhouseObservation(**obs_data)
-        return obs, payload['reward'], payload['done']
+    def step(self, action: GreenhouseAction) -> Tuple[GreenhouseObservation, float, bool]:
+        payload = action.model_dump() if hasattr(action, 'model_dump') else action.dict()
+        response = requests.post(f"{self.server_url}/step", json=payload)
+        data = response.json()
+        
+        obs = GreenhouseObservation(**data['observation'])
+        return obs, float(data['reward']), bool(data['done'])
+
+    def reset(self) -> GreenhouseObservation:
+        response = requests.post(f"{self.server_url}/reset")
+        data = response.json()
+        return GreenhouseObservation(**data['observation'])

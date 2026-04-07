@@ -1,84 +1,46 @@
-# Copyright (c) Meta Platforms, Inc. and affiliates.
-# All rights reserved.
-#
-# This source code is licensed under the BSD-style license found in the
-# LICENSE file in the root directory of this source tree.
+import gradio as gr
+from greenhouse.client import GreenhouseClient
+from greenhouse.models import GreenhouseAction
 
-"""
-FastAPI application for the Greenhouse Environment.
+# Initialize the client (talks to your local or deployed server)
+client = GreenhouseClient()
 
-This module creates an HTTP server that exposes the GreenhouseEnvironment
-over HTTP and WebSocket endpoints, compatible with EnvClient.
+def update_greenhouse(water, heat, fertilizer):
+    # 1. Create the action object
+    action = GreenhouseAction(
+        water_amount=water, 
+        heater_power=heat, 
+        buy_fertilizer=fertilizer
+    )
+    
+    # 2. Send to the simulation
+    obs, reward, done = client.step(action)
+    
+    # 3. Return the results for the UI
+    status = "✅ Healthy" if reward > 0 else "⚠️ Stress Detected"
+    return f"{obs.temp}°C", f"{obs.moisture}%", status, f"Score: {reward}"
 
-Endpoints:
-    - POST /reset: Reset the environment
-    - POST /step: Execute an action
-    - GET /state: Get current environment state
-    - GET /schema: Get action/observation schemas
-    - WS /ws: WebSocket endpoint for persistent sessions
+# Build the Interface
+with gr.Blocks(title="Smart Greenhouse Control") as demo:
+    gr.Markdown("# 🌿 Smart Greenhouse Dashboard")
+    
+    with gr.Row():
+        temp_out = gr.Label(label="Current Temp")
+        moist_out = gr.Label(label="Current Moisture")
+    
+    with gr.Row():
+        water_ctrl = gr.Slider(0, 1, label="Water Pump", value=0.1)
+        heat_ctrl = gr.Slider(0, 1, label="Heater Power", value=0.2)
+        fert_ctrl = gr.Checkbox(label="Apply Fertilizer")
+        
+    btn = gr.Button("Submit Step")
+    
+    msg = gr.Textbox(label="System Status")
+    reward_msg = gr.Textbox(label="RL Reward Signal")
 
-Usage:
-    # Development (with auto-reload):
-    uvicorn server.app:app --reload --host 0.0.0.0 --port 8000
-
-    # Production:
-    uvicorn server.app:app --host 0.0.0.0 --port 8000 --workers 4
-
-    # Or run directly:
-    python -m server.app
-"""
-
-try:
-    from openenv.core.env_server.http_server import create_app
-except Exception as e:  # pragma: no cover
-    raise ImportError(
-        "openenv is required for the web interface. Install dependencies with '\n    uv sync\n'"
-    ) from e
-
-try:
-    from models import GreenhouseAction, GreenhouseObservation
-    from .greenhouse_environment import GreenhouseEnvironment
-except ModuleNotFoundError:
-    from models import GreenhouseAction, GreenhouseObservation
-    from server.greenhouse_environment import GreenhouseEnvironment
-
-
-# Create the app with web interface and README integration
-app = create_app(
-    GreenhouseEnvironment,
-    GreenhouseAction,
-    GreenhouseObservation,
-    env_name="greenhouse",
-    max_concurrent_envs=1,  # increase this number to allow more concurrent WebSocket sessions
-)
-
-
-def main(host: str = "0.0.0.0", port: int = 8000):
-    """
-    Entry point for direct execution via uv run or python -m.
-
-    This function enables running the server without Docker:
-        uv run --project . server
-        uv run --project . server --port 8001
-        python -m greenhouse.server.app
-
-    Args:
-        host: Host address to bind to (default: "0.0.0.0")
-        port: Port number to listen on (default: 8000)
-
-    For production deployments, consider using uvicorn directly with
-    multiple workers:
-        uvicorn greenhouse.server.app:app --workers 4
-    """
-    import uvicorn
-
-    uvicorn.run(app, host=host, port=port)
-
+    btn.click(update_greenhouse, 
+              inputs=[water_ctrl, heat_ctrl, fert_ctrl], 
+              outputs=[temp_out, moist_out, msg, reward_msg])
 
 if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--port", type=int, default=8000)
-    args = parser.parse_args()
-    main(port=args.port)
+    demo.launch()

@@ -1,19 +1,15 @@
 from pydantic import BaseModel
-from openenv.core.env_server import Action, Observation, State
 
-class GreenhouseAction(Action, BaseModel):
-    water_amount: int     # 0 to 10
-    heater_power: int     # 0 to 5
-    buy_fertilizer: bool  # True/False
+class GreenhouseState(BaseModel):
+    temperature: float = 22.0
+    moisture: float = 50.0
+    energy_level: float = 100.0
 
-class GreenhouseObservation(Observation, BaseModel):
-    day: int
-    soil_moisture: float
-    temperature: float
-    budget: int
-    weather_forecast: str 
-    crop_health: float
+class GreenhouseAction(BaseModel):
+    water_amount: float
+    heater_power: float
+    buy_fertilizer: bool = False
 
-class GreenhouseState(State, BaseModel):
-    total_reward_accumulated: float
-    is_dead: bool
+class GreenhouseObservation(BaseModel):
+    temp: float
+    moisture: float
