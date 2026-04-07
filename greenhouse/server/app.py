@@ -1,165 +1,253 @@
 import uvicorn
 import pandas as pd
 import json
+import time
 from fastapi import FastAPI
 import gradio as gr
 from greenhouse.server.greenhouse_environment import GreenhouseEnvironment
 from greenhouse.models import GreenhouseAction
 
-# 1. Initialize the FastAPI Backend
-app = FastAPI(title="Smart Greenhouse Pro")
+# ---------------------------------------------------------
+# 1. Backend Engine & Analytics Initialization
+# ---------------------------------------------------------
+app = FastAPI(title="Smart Greenhouse Pro Enterprise")
 env = GreenhouseEnvironment()
 
-# Persistent state for analytics
-history = {"Step": [], "Temperature": [], "Moisture": [], "Reward": [], "Cumulative_Reward": []}
-step_count = 0
-total_reward = 0.0
+# Global state management for industrial-grade logging
+state_log = {
+    "Step": [],
+    "Temperature": [],
+    "Moisture": [],
+    "Step_Reward": [],
+    "Cumulative_Reward": [],
+    "Efficiency_Index": [],
+    "Timestamp": []
+}
+step_counter = 0
+total_accrued_reward = 0.0
 
 @app.post("/step")
-async def step(action: GreenhouseAction):
+async def api_step(action: GreenhouseAction):
     obs, reward, done = env.step(action)
     return {"observation": obs, "reward": reward, "done": done}
 
 @app.post("/reset")
-async def reset():
+async def api_reset():
     obs = env.reset()
     return {"observation": obs}
 
-# 2. UI Logic with JSON and Analytics
-def ui_step(water, heat, fertilizer):
-    global step_count, total_reward
+# ---------------------------------------------------------
+# 2. Advanced Business Logic & UI Processing
+# ---------------------------------------------------------
+def process_simulation_step(water, heat, fertilizer):
+    global step_counter, total_accrued_reward
+    
+    # 2.1 Action Packaging
     action = GreenhouseAction(
         water_amount=water, 
         heater_power=heat, 
         buy_fertilizer=fertilizer
     )
     
+    # 2.2 Execute Physics Step
     obs, reward, done = env.step(action)
-    step_count += 1
-    total_reward += reward
     
-    # Update Analytics Data
-    history["Step"].append(step_count)
-    history["Temperature"].append(round(obs.temp, 2))
-    history["Moisture"].append(round(obs.moisture, 2))
-    history["Reward"].append(round(reward, 4))
-    history["Cumulative_Reward"].append(round(total_reward, 4))
+    # 2.3 Analytics Calculations
+    step_counter += 1
+    total_accrued_reward += reward
+    # Calculate a mock efficiency index for professional visual variety
+    efficiency = (reward + 1) / 2 * 100 
     
-    df = pd.DataFrame(history)
+    # 2.4 Update Industrial Logs
+    state_log["Step"].append(step_counter)
+    state_log["Temperature"].append(round(obs.temp, 2))
+    state_log["Moisture"].append(round(obs.moisture, 2))
+    state_log["Step_Reward"].append(round(reward, 4))
+    state_log["Cumulative_Reward"].append(round(total_accrued_reward, 4))
+    state_log["Efficiency_Index"].append(round(efficiency, 2))
+    state_log["Timestamp"].append(time.strftime("%H:%M:%S"))
     
-    # Professional Status Logic
-    status = "Operational" if reward > 0 else "Environmental Stress"
+    df = pd.DataFrame(state_log)
     
-    # Generate JSON Output for RL Debugging
-    json_output = {
-        "step": step_count,
-        "state": {"temp": obs.temp, "moisture": obs.moisture},
-        "action_taken": action.dict(),
-        "reward": reward,
-        "cumulative_reward": total_reward,
-        "terminal": done
+    # 2.5 Dynamic Status Reports
+    if reward > 0.8:
+        status = "Optimal Performance"
+    elif reward > 0.4:
+        status = "Nominal Operation"
+    else:
+        status = "Critical Variance Detected"
+        
+    # 2.6 Generate Machine-Readable State Object (JSON)
+    telemetry_json = {
+        "metadata": {
+            "version": "4.0.1",
+            "environment_id": "PU-BANGALORE-SIM-01",
+            "last_sync": state_log["Timestamp"][-1]
+        },
+        "telemetry": {
+            "step": step_counter,
+            "metrics": {"temp": obs.temp, "moist": obs.moisture},
+            "economic_data": {"reward": reward, "total": total_accrued_reward}
+        },
+        "control_state": action.dict(),
+        "is_terminal": done
     }
     
     return (
         f"{obs.temp:.2f} C", 
         f"{obs.moisture:.2f} %", 
         status, 
-        f"{total_reward:.4f}",
-        json.dumps(json_output, indent=2),
-        df, 
-        df.tail(15)
+        f"{total_accrued_reward:.4f}",
+        json.dumps(telemetry_json, indent=2),
+        df,  # For Charts
+        df   # For Data Logs
     )
 
-def ui_reset():
-    global step_count, total_reward, history
+def industrial_reset():
+    global step_counter, total_accrued_reward, state_log
     obs = env.reset()
-    step_count = 0
-    total_reward = 0.0
-    history = {"Step": [], "Temperature": [], "Moisture": [], "Reward": [], "Cumulative_Reward": []}
-    empty_df = pd.DataFrame(columns=["Step", "Temperature", "Moisture", "Reward", "Cumulative_Reward"])
+    step_counter = 0
+    total_accrued_reward = 0.0
+    for key in state_log: state_log[key] = []
     
+    empty_df = pd.DataFrame(columns=state_log.keys())
     return (
         f"{obs.temp:.2f} C", 
         f"{obs.moisture:.2f} %", 
-        "System Reset", 
+        "System Initialized", 
         "0.0000", 
         "{}", 
         empty_df, 
         empty_df
     )
 
-# 3. Professional Interface Design
-with gr.Blocks(title="Greenhouse Control Systems") as demo:
+# ---------------------------------------------------------
+# 3. Enterprise UI Architecture (Slate & Emerald Theme)
+# ---------------------------------------------------------
+with gr.Blocks(title="Industrial Greenhouse Control") as demo:
     gr.Markdown("""
-    # Smart Greenhouse Control Systems
-    **Enterprise Environmental Simulation & Reinforcement Learning Interface**
+    # Enterprise Smart Greenhouse Control Interface
+    **Digital Twin Simulation & Reinforcement Learning Telemetry Dashboard**
     """)
     
     with gr.Row():
-        # Configuration Panel
-        with gr.Column(scale=1):
-            gr.Markdown("### Control Configuration")
-            water_ctrl = gr.Slider(0, 1, label="Hydration Intensity", value=0.1)
-            heat_ctrl = gr.Slider(0, 1, label="Thermal Output", value=0.2)
-            fert_ctrl = gr.Checkbox(label="Enable Nutrient Supplement", value=False)
+        # -- CONTROL INTERFACE --
+        with gr.Column(scale=1, variant="panel"):
+            gr.Markdown("### Control Parameters")
+            water_input = gr.Slider(0, 1, label="Irrigation Flow Rate", value=0.1)
+            heat_input = gr.Slider(0, 1, label="Thermal Output Power", value=0.2)
+            fert_toggle = gr.Checkbox(label="Automated Nutrient Injection", value=False)
             
             with gr.Row():
-                btn = gr.Button("Execute Step", variant="primary")
-                reset_btn = gr.Button("Reset Environment", variant="stop")
+                execute_btn = gr.Button("Execute Simulation Step", variant="primary")
+                reset_sys_btn = gr.Button("Hard Reset Environment", variant="stop")
             
-            gr.Markdown("### Step Metadata (JSON)")
-            json_display = gr.Code(label="State Object", language="json", interactive=False)
+            gr.Markdown("### Machine-Readable State (JSON)")
+            json_explorer = gr.Code(label="JSON Telemetry Output", language="json", interactive=False)
 
-        # Analytics Panel
+        # -- ANALYTICS DASHBOARD --
         with gr.Column(scale=2):
-            gr.Markdown("### System Telemetry")
+            gr.Markdown("### Real-Time Telemetry")
             with gr.Row():
-                temp_out = gr.Label(label="Internal Temperature")
-                moist_out = gr.Label(label="Substrate Moisture")
+                temp_gauge = gr.Label(label="Atmospheric Temperature")
+                moist_gauge = gr.Label(label="Soil Moisture Content")
             
             with gr.Row():
-                status_msg = gr.Textbox(label="Operational Status", interactive=False)
-                reward_msg = gr.Textbox(label="Cumulative Reward", interactive=False)
+                status_box = gr.Textbox(label="Operational Status", interactive=False)
+                reward_box = gr.Textbox(label="Accrued Cumulative Reward", interactive=False)
 
             with gr.Tabs():
-                with gr.TabItem("Performance Analytics"):
+                with gr.TabItem("Performance Visualization"):
                     with gr.Row():
-                        temp_chart = gr.LinePlot(
+                        # High Precision Thermal Chart
+                        thermal_plot = gr.LinePlot(
                             label="Thermal Trends",
                             x="Step",
                             y="Temperature",
-                            title="Temperature (C)",
+                            title="Temperature Variance (C)",
                             tooltip=["Step", "Temperature"],
-                            y_lim=[10, 45]
+                            y_lim=[15, 40],
+                            color_symbol="green",
+                            container=True
                         )
-                        reward_chart = gr.LinePlot(
-                            label="Reward Progression",
+                        # The Fix: Dedicated Reward Progression Chart
+                        reward_prog_plot = gr.LinePlot(
+                            label="Economic Logic Performance",
                             x="Step",
                             y="Cumulative_Reward",
-                            title="Cumulative Reward",
-                            tooltip=["Step", "Cumulative_Reward"]
+                            title="Cumulative Reward Progression",
+                            tooltip=["Step", "Cumulative_Reward"],
+                            color_symbol="emerald",
+                            container=True
                         )
                 
-                with gr.TabItem("Data Logs"):
-                    history_table = gr.DataFrame(label="Simulation History")
+                with gr.TabItem("Industrial Audit Logs"):
+                    gr.Markdown("### Complete Step-by-Step Historical Audit")
+                    audit_table = gr.DataFrame(
+                        label="System Logs",
+                        interactive=False,
+                        wrap=True
+                    )
+                
+                with gr.TabItem("Efficiency Metrics"):
+                    efficiency_plot = gr.LinePlot(
+                        label="Operational Efficiency Index",
+                        x="Step",
+                        y="Efficiency_Index",
+                        title="System Efficiency (%)",
+                        y_lim=[0, 100]
+                    )
 
-    # Event Wiring
-    btn.click(
-        ui_step, 
-        inputs=[water_ctrl, heat_ctrl, fert_ctrl], 
-        outputs=[temp_out, moist_out, status_msg, reward_msg, json_display, temp_chart, history_table]
+    # ---------------------------------------------------------
+    # 4. Event & Data Pipeline Wiring (The Fix)
+    # ---------------------------------------------------------
+    execute_btn.click(
+        fn=process_simulation_step,
+        inputs=[water_input, heat_input, fert_toggle],
+        outputs=[
+            temp_gauge, 
+            moist_gauge, 
+            status_box, 
+            reward_box, 
+            json_explorer, 
+            thermal_plot, 
+            audit_table
+        ]
     ).then(
-        # Update moisture chart using the same dataframe
-        lambda df: df, inputs=[temp_chart], outputs=[temp_chart] 
+        # This maps the updated dataframe from thermal_plot to the other charts
+        fn=lambda x: x,
+        inputs=[thermal_plot],
+        outputs=[reward_prog_plot]
+    ).then(
+        fn=lambda x: x,
+        inputs=[thermal_plot],
+        outputs=[efficiency_plot]
     )
 
-    reset_btn.click(
-        ui_reset, 
-        outputs=[temp_out, moist_out, status_msg, reward_msg, json_display, temp_chart, history_table]
+    reset_sys_btn.click(
+        fn=industrial_reset,
+        outputs=[
+            temp_gauge, 
+            moist_gauge, 
+            status_box, 
+            reward_box, 
+            json_explorer, 
+            thermal_plot, 
+            audit_table
+        ]
+    ).then(
+        fn=lambda x: x,
+        inputs=[thermal_plot],
+        outputs=[reward_prog_plot]
+    ).then(
+        fn=lambda x: x,
+        inputs=[thermal_plot],
+        outputs=[efficiency_plot]
     )
 
-# 4. Global Theming and Launch
-# Using a slate/zinc professional theme
+# ---------------------------------------------------------
+# 5. Enterprise Theming & Deployment
+# ---------------------------------------------------------
 app = gr.mount_gradio_app(
     app, 
     demo, 
@@ -167,7 +255,8 @@ app = gr.mount_gradio_app(
     theme=gr.themes.Soft(
         primary_hue="slate", 
         secondary_hue="emerald",
-        font=[gr.themes.GoogleFont("Inter"), "ui-sans-serif", "system-ui"]
+        neutral_hue="zinc",
+        font=[gr.themes.GoogleFont("Inter"), "sans-serif"]
     )
 )
 
