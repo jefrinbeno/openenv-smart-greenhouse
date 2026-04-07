@@ -1,0 +1,13 @@
+# OpenEnv Environment Configuration
+name: smart-greenhouse-sim
+version: "1.0.0"
+type: "docker"
+
+# This points the validator to your FastAPI endpoints
+api:
+  base_url: "http://localhost:7860"
+  reset_endpoint: "/reset"
+  step_endpoint: "/step"
+
+# Description for the validator
+description: "Industrial-grade digital twin for greenhouse climate and resource management."
