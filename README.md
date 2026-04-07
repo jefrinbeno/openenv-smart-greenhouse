@@ -1,4 +1,3 @@
-This is a comprehensive, professional **README.md** tailored for your Smart Greenhouse Enterprise project. It covers the technical architecture, the digital twin logic, and the CI/CD pipeline you've built.
 
 ---
 
