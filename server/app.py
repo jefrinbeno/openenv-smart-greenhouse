@@ -1,10 +1,18 @@
-import sys
+import uvicorn
 import os
+import sys
 
-# Add the current directory to path so it can find the greenhouse module
+# Ensure the root directory is in the path so greenhouse module can be found
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from greenhouse.server.app import app, main
+from greenhouse.server.app import app
+
+def main():
+    """
+    Main entry point for the OpenEnv validator to start the server.
+    """
+    # The validator expects the server to run on port 7860
+    uvicorn.run(app, host="0.0.0.0", port=7860)
 
 if __name__ == "__main__":
     main()
