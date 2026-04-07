@@ -58,3 +58,54 @@ The system is optimized for containerized environments. The Dockerfile uses a mu
 
 Project Version: v4.1 (Stable)
 
+
+---
+
+## 🎮 How to Use the Digital Twin
+
+### 1. Manual Intervention (Gradio)
+The **Dashboard** allows you to override the system:
+* **Irrigation Flow:** Adjust the `water_amount` to prevent substrate dehydration.
+* **Thermal Output:** Control the `heater_power` to maintain the optimal 24°C - 28°C range.
+* **Execute Step:** Click to advance the simulation by one time-step and see the physics engine calculate the new state.
+
+### 2. Autonomous Agent Control (API)
+External Reinforcement Learning agents can interact with the simulation via HTTP POST requests:
+* **Endpoint:** `/step`
+* **Payload Structure:**
+    ```json
+    {
+      "water_amount": 0.5,
+      "heater_power": 0.3
+    }
+    ```
+* **Response:** Returns a `State` observation, a `Reward` float, and a `Terminal` boolean.
+
+---
+
+## 📈 Reinforcement Learning Logic
+
+### The Reward Function
+The system evaluates performance based on a weighted sum of three factors:
+1. **Plant Health:** Penalty for extreme temperatures or dry soil.
+2. **Resource Efficiency:** Penalty for high water and electricity usage.
+3. **Nutrient Stability:** Bonus for maintaining consistent substrate moisture levels.
+
+
+
+---
+
+## 🐳 Deployment & CI/CD
+
+This repository is "Live-Synced." On every `git push` to the `main` branch:
+1. **GitHub Actions** triggers a synchronization workflow.
+2. The code is pushed to **Hugging Face Spaces**.
+3. A **Docker** build is initiated, installing all dependencies from `requirements.txt`.
+4. The **FastAPI/Gradio** server is deployed as a containerized microservice.
+
+
+
+---
+
+**Project Version:** v4.1 (Stable)
+**Developer:** Jefrin Beno J M
