@@ -14,6 +14,7 @@ app = FastAPI(title="Smart Greenhouse Pro Enterprise")
 env = GreenhouseEnvironment()
 
 # Global state management for industrial-grade logging
+# Initializing with a small offset ensures charts have a baseline
 state_log = {
     "Step": [],
     "Temperature": [],
@@ -55,8 +56,8 @@ def process_simulation_step(water, heat, fertilizer):
     # 2.3 Analytics Calculations
     step_counter += 1
     total_accrued_reward += reward
-    # Calculate a mock efficiency index for professional visual variety
-    efficiency = (reward + 1) / 2 * 100 
+    # Efficiency index calculation for professional visualization
+    efficiency = max(0, min(100, (reward + 1) / 2 * 100))
     
     # 2.4 Update Industrial Logs
     state_log["Step"].append(step_counter)
@@ -80,7 +81,7 @@ def process_simulation_step(water, heat, fertilizer):
     # 2.6 Generate Machine-Readable State Object (JSON)
     telemetry_json = {
         "metadata": {
-            "version": "4.0.1",
+            "version": "4.1.0",
             "environment_id": "PU-BANGALORE-SIM-01",
             "last_sync": state_log["Timestamp"][-1]
         },
@@ -99,8 +100,9 @@ def process_simulation_step(water, heat, fertilizer):
         status, 
         f"{total_accrued_reward:.4f}",
         json.dumps(telemetry_json, indent=2),
-        df,  # For Charts
-        df   # For Data Logs
+        df,  # Target for Thermal Chart
+        df,  # Target for Reward Chart
+        df   # Target for Audit Logs
     )
 
 def industrial_reset():
@@ -118,6 +120,7 @@ def industrial_reset():
         "0.0000", 
         "{}", 
         empty_df, 
+        empty_df,
         empty_df
     )
 
@@ -167,17 +170,15 @@ with gr.Blocks(title="Industrial Greenhouse Control") as demo:
                             title="Temperature Variance (C)",
                             tooltip=["Step", "Temperature"],
                             y_lim=[15, 40],
-                            color_symbol="green",
                             container=True
                         )
-                        # The Fix: Dedicated Reward Progression Chart
+                        # Reward Progression Chart
                         reward_prog_plot = gr.LinePlot(
                             label="Economic Logic Performance",
                             x="Step",
                             y="Cumulative_Reward",
                             title="Cumulative Reward Progression",
                             tooltip=["Step", "Cumulative_Reward"],
-                            color_symbol="emerald",
                             container=True
                         )
                 
@@ -188,18 +189,9 @@ with gr.Blocks(title="Industrial Greenhouse Control") as demo:
                         interactive=False,
                         wrap=True
                     )
-                
-                with gr.TabItem("Efficiency Metrics"):
-                    efficiency_plot = gr.LinePlot(
-                        label="Operational Efficiency Index",
-                        x="Step",
-                        y="Efficiency_Index",
-                        title="System Efficiency (%)",
-                        y_lim=[0, 100]
-                    )
 
     # ---------------------------------------------------------
-    # 4. Event & Data Pipeline Wiring (The Fix)
+    # 4. Event & Data Pipeline Wiring
     # ---------------------------------------------------------
     execute_btn.click(
         fn=process_simulation_step,
@@ -211,17 +203,9 @@ with gr.Blocks(title="Industrial Greenhouse Control") as demo:
             reward_box, 
             json_explorer, 
             thermal_plot, 
+            reward_prog_plot,
             audit_table
         ]
-    ).then(
-        # This maps the updated dataframe from thermal_plot to the other charts
-        fn=lambda x: x,
-        inputs=[thermal_plot],
-        outputs=[reward_prog_plot]
-    ).then(
-        fn=lambda x: x,
-        inputs=[thermal_plot],
-        outputs=[efficiency_plot]
     )
 
     reset_sys_btn.click(
@@ -233,16 +217,9 @@ with gr.Blocks(title="Industrial Greenhouse Control") as demo:
             reward_box, 
             json_explorer, 
             thermal_plot, 
+            reward_prog_plot,
             audit_table
         ]
-    ).then(
-        fn=lambda x: x,
-        inputs=[thermal_plot],
-        outputs=[reward_prog_plot]
-    ).then(
-        fn=lambda x: x,
-        inputs=[thermal_plot],
-        outputs=[efficiency_plot]
     )
 
 # ---------------------------------------------------------
