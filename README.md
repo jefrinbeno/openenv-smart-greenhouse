@@ -52,6 +52,7 @@ The interface provides a live **JSON Telemetry Output** box. This allows researc
 │   └── models.py            # Pydantic Data Models
 ├── Dockerfile               # Container Configuration
 ├── requirements.txt         # Dependency Manifest
+├── inferency.py
 └── README.md                # Project Documentation
 🐳 Docker Deployment
 The system is optimized for containerized environments. The Dockerfile uses a multi-stage build philosophy to ensure the environment is identical across all deployment stages.
