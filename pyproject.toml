@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "smart-greenhouse-sim"
+version = "1.0.0"
+description = "Industrial-grade digital twin for greenhouse climate and resource management."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "gradio",
+    "pandas",
+    "numpy",
+    "openai",
+    "python-dotenv"
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["greenhouse*"]
