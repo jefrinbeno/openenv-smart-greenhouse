@@ -1,17 +1,24 @@
-FROM python:3.12
+FROM python:3.12-slim
 
 WORKDIR /code
 
-# 1. Install dependencies
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy and install requirements
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 2. Copy the entire project
+# Copy the entire project
 COPY . .
 
-# 3. CRITICAL: Tell Python to look in the root folder for imports
+# Set PYTHONPATH so 'greenhouse' is treatable as a module
 ENV PYTHONPATH=/code
 
-# 4. Run the app using the module flag (-m) 
-# This treats 'greenhouse' as a package correctly
-CMD ["python", "-m", "greenhouse.server.app"]
+# Expose Gradio/FastAPI port
+EXPOSE 7860
+
+# Start the application using the module path
+CMD ["python", "greenhouse/server/app.py"]
