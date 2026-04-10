@@ -16,7 +16,10 @@ dependencies = [
     "openenv>=0.1.0"
 ]
 
-# This tells the Scaler validator that your environment exists
+# THIS IS THE PART THE POP-UP IS ASKING FOR
+[project.scripts]
+server = "server.app:main"
+
 [project.entry-points."openenv.environments"]
 smart-greenhouse = "openenv_smart_greenhouse:GreenhouseEnv"
 
