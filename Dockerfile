@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Install EVERY library your code touches
+# Install ALL mandatory and helper libraries
 RUN pip install --no-cache-dir \
     fastapi \
     uvicorn \
@@ -22,11 +22,14 @@ RUN pip install --no-cache-dir \
     openenv \
     hatchling
 
-# Copy the rest of the application
+# Copy the entire project
 COPY . .
 
-# Expose the port
+# Ensure server/app.py is executable
+RUN chmod +x server/app.py
+
+# Expose the mandatory port for the validator
 EXPOSE 7860
 
-# Command to run the application
+# The command MUST point to the root-level server/app.py
 CMD ["python", "server/app.py"]
