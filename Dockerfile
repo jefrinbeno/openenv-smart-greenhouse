@@ -5,20 +5,26 @@ WORKDIR /code
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
+    curl \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy and install requirements
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install ALL required libraries for the agent
+RUN pip install --no-cache-dir \
+    fastapi \
+    uvicorn \
+    gradio \
+    pandas \
+    numpy \
+    python-dotenv \
+    openai \
+    openenv
 
-# Copy the entire project
+# Copy your code into the container
 COPY . .
 
-# Set PYTHONPATH so 'greenhouse' is treatable as a module
-ENV PYTHONPATH=/code
-
-# Expose Gradio/FastAPI port
+# Expose the app port
 EXPOSE 7860
 
-# Start the application using the module path
-CMD ["python", "greenhouse/server/app.py"]
+# Point to your server entry point
+CMD ["python", "server/app.py"]
