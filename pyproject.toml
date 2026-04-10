@@ -1,6 +1,6 @@
 [project]
 name = "openenv-smart-greenhouse"
-version = "0.1.0"
+version = "1.0.0"
 description = "AI-ready digital twin for greenhouse climate management."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -16,8 +16,9 @@ dependencies = [
     "openenv>=0.1.0"
 ]
 
-[project.scripts]
-server = "server.app:main"
+# This tells the Scaler validator that your environment exists
+[project.entry-points."openenv.environments"]
+smart-greenhouse = "openenv_smart_greenhouse:GreenhouseEnv"
 
 [build-system]
 requires = ["hatchling"]

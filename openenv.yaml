@@ -1,6 +1,5 @@
 name: "openenv-smart-greenhouse"
 version: "1.0.0"
-description: "AI-driven digital twin for sustainable greenhouse management."
 tasks:
   - id: "temp_control"
     name: "Temperature Control"
