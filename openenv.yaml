@@ -1,13 +1,13 @@
-name: openenv-smart-greenhouse
+name: "openenv-smart-greenhouse"
 version: "1.0.0"
 description: "AI-driven digital twin for sustainable greenhouse management."
 tasks:
-  - name: "temperature_control"
-    description: "Maintain temperature between 22-26C."
+  - id: "temp_control"
+    name: "Temperature Control"
     grader: true
-  - name: "humidity_stabilization"
-    description: "Keep humidity at 60% for optimal growth."
+  - id: "hum_control"
+    name: "Humidity Control"
     grader: true
-  - name: "resource_optimization"
-    description: "Minimize water and electricity usage."
+  - id: "resource_mgmnt"
+    name: "Resource Management"
     grader: true
