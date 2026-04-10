@@ -1,45 +1,21 @@
-import os
-from openai import OpenAI
-from greenhouse.server.environment import GreenhouseEnvironment  # Adjust path if needed
+import requests
+import json
 
-# 1. Environment Variables (Required by Checklist)
-# Set your active model name as the default for the evaluator
-API_BASE_URL = os.getenv("API_BASE_URL", "https://api-inference.huggingface.co/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "your-chosen-model-here") 
-HF_TOKEN = os.getenv("HF_TOKEN") # DO NOT set a default here
-
-# 2. Configure OpenAI Client
-client = OpenAI(
-    base_url=API_BASE_URL,
-    api_key=HF_TOKEN
-)
-
-def run_inference():
-    # START Log (Required Format)
-    print("START")
-    
-    env = GreenhouseEnvironment()
-    obs = env.reset()
-    done = False
-    step_count = 0
-
-    while not done and step_count < 10:
-        # STEP Log (Required Format)
-        print(f"STEP {step_count}")
-        
-        # Example: LLM call using the configured variables
-        response = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[{"role": "user", "content": f"State: {obs}. What action?"}]
+def evaluate_action(state, action):
+    """
+    Interface for the OpenEnv validator to interact with the greenhouse.
+    """
+    try:
+        # The validator runs this inside the container where the server is on 7860
+        response = requests.post(
+            "http://localhost:7860/step", 
+            json={"state": state, "action": action},
+            timeout=5
         )
-        
-        # Logic to parse LLM response and call env.step() would go here
-        # obs, reward, done, info = env.step(action)
-        
-        step_count += 1
-
-    # END Log (Required Format)
-    print("END")
+        return response.json()
+    except Exception as e:
+        return {"error": str(e)}
 
 if __name__ == "__main__":
-    run_inference()
+    # Small local test
+    print("Inference script initialized.")
