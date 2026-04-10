@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Install ALL required libraries for the agent
+# Install EVERY library your code touches
 RUN pip install --no-cache-dir \
     fastapi \
     uvicorn \
@@ -18,13 +18,15 @@ RUN pip install --no-cache-dir \
     numpy \
     python-dotenv \
     openai \
-    openenv
+    requests \
+    openenv \
+    hatchling
 
-# Copy your code into the container
+# Copy the rest of the application
 COPY . .
 
-# Expose the app port
+# Expose the port
 EXPOSE 7860
 
-# Point to your server entry point
+# Command to run the application
 CMD ["python", "server/app.py"]
