@@ -35,17 +35,17 @@ def reset_simulation():
     empty_df = get_empty_df()
     return [], empty_df, empty_df, empty_df, {}, "🟢 System Reset. Awaiting Initialization..."
 
-def simulate_core(irrigation, target_temp, ext_temp, history):
-    now = datetime.datetime.now().strftime("%H:%M:%S")
+# ADDED override_time to manipulate the clock for the graphs
+def simulate_core(irrigation, target_temp, ext_temp, history, override_time=None):
+    now = override_time if override_time else datetime.datetime.now().strftime("%H:%M:%S")
     
-    # Enhanced Physics Simulation (External Temp now affects Internal Temp)
+    # Enhanced Physics Simulation
     actual_temp = (target_temp * 0.7) + (ext_temp * 0.3) + random.uniform(-0.8, 0.8)
     soil_moisture = 15 + (irrigation * 75) + random.uniform(-2.0, 2.0)
     energy_used = abs(actual_temp - target_temp) * 1.8 + (irrigation * 2.5) + random.uniform(0.1, 0.4)
     
     anomaly_risk = random.uniform(0.01, 0.08) if 18 <= target_temp <= 28 else random.uniform(0.5, 0.95)
     
-    # Dynamic Status Alerts
     if anomaly_risk > 0.7:
         status = "🔴 CRITICAL: High Behavior Anomaly Risk Detected!"
         reward = 0.30
@@ -70,7 +70,6 @@ def simulate_core(irrigation, target_temp, ext_temp, history):
     
     history.append(new_record)
     
-    # Limit history to prevent browser memory lag during long sessions
     if len(history) > 50:
         history = history[-50:]
         
@@ -95,18 +94,22 @@ def simulate_single(irrigation, target_temp, ext_temp, history):
     return simulate_core(irrigation, target_temp, ext_temp, history)
 
 def batch_simulate(irrigation, target_temp, ext_temp, history):
-    # Simulates 5 sequential steps to rapidly build graph curves
     curr_irrigation = irrigation
     curr_target = target_temp
-    for _ in range(5):
-        history, df, p1, p2, json_state, status = simulate_core(curr_irrigation, curr_target, ext_temp, history)
-        # Add slight drift to inputs to make the graph curves look organic
+    base_time = datetime.datetime.now()
+    
+    for i in range(5):
+        # TIME TRAVEL: Add 1 minute to each step so the graph has distinct X-axis points!
+        step_time = (base_time + datetime.timedelta(minutes=i)).strftime("%H:%M:%S")
+        history, df, p1, p2, json_state, status = simulate_core(curr_irrigation, curr_target, ext_temp, history, override_time=step_time)
+        
         curr_target += random.uniform(-0.5, 0.5)
         curr_irrigation = max(0.0, min(1.0, curr_irrigation + random.uniform(-0.05, 0.05)))
+        
     return history, df, df, df, json_state, status
 
 # Build the UI
-with gr.Blocks(theme=gr.themes.Soft(primary_hue="emerald")) as demo:
+with gr.Blocks() as demo:
     session_history = gr.State([])
     
     gr.Markdown("""
@@ -116,7 +119,6 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="emerald")) as demo:
     
     sys_status = gr.Textbox(label="System Diagnostics & ML Alerts", value="🟢 Awaiting Initialization...", interactive=False)
 
-    # ACCORDION LAYOUT: Allows Controls to collapse, giving full screen to Data
     with gr.Accordion("🎛️ Environment Configuration & Agent Controls", open=True):
         with gr.Row():
             with gr.Column():
@@ -132,7 +134,6 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="emerald")) as demo:
             batch_btn = gr.Button("⏩ Batch Simulate (5 Steps)", variant="primary")
             reset_btn = gr.Button("🔄 Reset System", variant="secondary")
 
-    # TABS FOR FULL-WIDTH VISUALIZATIONS
     with gr.Tabs():
         with gr.Tab("📈 Live Telemetry Graphs"):
             with gr.Row():
@@ -145,7 +146,6 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="emerald")) as demo:
         with gr.Tab("🧩 Raw JSON & ML Diagnostics"):
             json_output = gr.JSON()
 
-    # Event Mapping
     step_btn.click(
         simulate_single, 
         [irrigation_slider, temp_slider, ext_temp_slider, session_history],
@@ -164,5 +164,4 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="emerald")) as demo:
         [session_history, telemetry_table, temp_plot, moist_plot, json_output, sys_status]
     )
 
-# Mount the UI onto the FastAPI app
 app = gr.mount_gradio_app(app, demo, path="/")
