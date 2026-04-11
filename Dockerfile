@@ -1,15 +1,14 @@
 FROM python:3.12-slim
 
-WORKDIR /code
-
-# Install system dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Install ALL mandatory and helper libraries
+WORKDIR /code
+
+# Install dependencies
 RUN pip install --no-cache-dir \
     fastapi \
     uvicorn \
@@ -22,14 +21,8 @@ RUN pip install --no-cache-dir \
     openenv \
     hatchling
 
-# Copy the entire project
 COPY . .
 
-# Ensure server/app.py is executable
-RUN chmod +x server/app.py
-
-# Expose the mandatory port for the validator
-EXPOSE 7860
-
-# The command MUST point to the root-level server/app.py
-CMD ["python", "server/app.py"]
+# We no longer need chmod on a non-existent server/app.py
+# Instead, we run the app directly via uvicorn from the new package
+CMD ["uvicorn", "greenhouse_package.env_server:app", "--host", "0.0.0.0", "--port", "7860"]
