@@ -3,6 +3,7 @@ import gradio as gr
 import pandas as pd
 import datetime
 import random
+import math
 
 app = FastAPI()
 
@@ -35,26 +36,72 @@ def reset_simulation():
     empty_df = get_empty_df()
     return [], empty_df, empty_df, empty_df, {}, "🟢 System Reset. Awaiting Initialization..."
 
-# ADDED override_time to manipulate the clock for the graphs
 def simulate_core(irrigation, target_temp, ext_temp, history, override_time=None):
     now = override_time if override_time else datetime.datetime.now().strftime("%H:%M:%S")
     
-    # Enhanced Physics Simulation
-    actual_temp = (target_temp * 0.7) + (ext_temp * 0.3) + random.uniform(-0.8, 0.8)
-    soil_moisture = 15 + (irrigation * 75) + random.uniform(-2.0, 2.0)
-    energy_used = abs(actual_temp - target_temp) * 1.8 + (irrigation * 2.5) + random.uniform(0.1, 0.4)
-    
-    anomaly_risk = random.uniform(0.01, 0.08) if 18 <= target_temp <= 28 else random.uniform(0.5, 0.95)
-    
-    if anomaly_risk > 0.7:
-        status = "🔴 CRITICAL: High Behavior Anomaly Risk Detected!"
-        reward = 0.30
-    elif 20 <= actual_temp <= 28:
-        status = "🟢 Optimal Operation"
-        reward = 0.95
+    # Extract Previous State (Markov Property)
+    if len(history) > 0:
+        prev_temp = history[-1]["Actual Temp (°C)"]
+        prev_moist = history[-1]["Moisture (%)"]
     else:
-        status = "🟠 Warning: Suboptimal Climate Diagnostics"
-        reward = 0.65
+        prev_temp = 24.0 # Initial baseline
+        prev_moist = 40.0 # Initial baseline
+
+    # 1. MATHEMATICAL CLAMPING (Action Bounds)
+    irrigation = max(0.0, min(1.0, float(irrigation)))
+    target_temp = max(10.0, min(40.0, float(target_temp)))
+    ext_temp = float(ext_temp)
+    
+    # 2. THERMODYNAMIC PHYSICS MODEL
+    insulation_factor = 0.05  # Heat leak to external environment
+    hvac_power = 0.35         # HVAC cooling/heating rate
+    
+    delta_hvac = hvac_power * (target_temp - prev_temp)
+    delta_ext = insulation_factor * (ext_temp - prev_temp)
+    actual_temp = prev_temp + delta_hvac + delta_ext + random.uniform(-0.2, 0.2)
+    
+    # 3. HYDROLOGY MODEL (Evapotranspiration)
+    evap_rate = 0.15 * (actual_temp / 24.0) # Evaporates faster when hotter
+    moisture_added = irrigation * 15.0      # Pump volume
+    soil_moisture = prev_moist - evap_rate + moisture_added + random.uniform(-0.5, 0.5)
+    
+    # State Observation Clamping (Physics limits)
+    actual_temp = max(-10.0, min(60.0, actual_temp))
+    soil_moisture = max(0.0, min(100.0, soil_moisture))
+    
+    # 4. ENERGY EXPENDITURE (Work done by HVAC and Pumps)
+    hvac_energy = abs(delta_hvac) * 1.8 
+    pump_energy = irrigation * 2.2
+    energy_used = hvac_energy + pump_energy + random.uniform(0.05, 0.15) # + Idle draw
+    
+    # ML Anomaly Risk Generation
+    anomaly_risk = random.uniform(0.01, 0.08) if 18 <= target_temp <= 28 else random.uniform(0.6, 0.98)
+    
+    # 5. CONTINUOUS "GOLDILOCKS" REWARD FUNCTION
+    optimal_temp = 24.0
+    optimal_moist = 60.0
+    
+    # Gaussian curves for optimal state matching
+    temp_reward = math.exp(-0.05 * ((actual_temp - optimal_temp) ** 2))
+    moist_reward = math.exp(-0.005 * ((soil_moisture - optimal_moist) ** 2))
+    
+    # Linear penalties
+    energy_penalty = energy_used * 0.08
+    anomaly_penalty = anomaly_risk * 0.4
+    
+    # Final Formula
+    raw_reward = (0.6 * temp_reward) + (0.4 * moist_reward) - energy_penalty - anomaly_penalty
+    reward = max(0.0, min(1.0, raw_reward)) # Bound final output
+    
+    # Dynamic Status Alerts
+    if anomaly_risk > 0.7:
+        status = "🔴 CRITICAL: Behavior Anomaly Risk Detected!"
+    elif reward >= 0.80:
+        status = "🟢 Optimal Operation (High Efficiency)"
+    elif reward >= 0.50:
+        status = "🟡 Acceptable Operation (Moderate Deviation/Drain)"
+    else:
+        status = "🟠 Warning: Suboptimal Climate or Extreme Resource Waste"
 
     new_record = {
         "Time": now,
@@ -65,14 +112,11 @@ def simulate_core(irrigation, target_temp, ext_temp, history, override_time=None
         "Moisture (%)": round(soil_moisture, 2),
         "Energy (kWh)": round(energy_used, 2),
         "Anomaly": round(anomaly_risk, 3),
-        "Reward": reward
+        "Reward": round(reward, 3) 
     }
     
     history.append(new_record)
-    
-    if len(history) > 50:
-        history = history[-50:]
-        
+    if len(history) > 50: history = history[-50:]
     df = pd.DataFrame(history)
     
     json_state = {
@@ -85,7 +129,16 @@ def simulate_core(irrigation, target_temp, ext_temp, history, override_time=None
             "energy_consumption_kwh": round(energy_used, 2)
         },
         "ml_diagnostics": {"behavior_anomaly_score": round(anomaly_risk, 3)},
-        "rl_metrics": {"step_reward": reward, "cumulative_status": status}
+        "rl_metrics": {
+            "step_reward": round(reward, 3), 
+            "reward_breakdown": {
+                "temp_score": round(temp_reward, 3),
+                "moisture_score": round(moist_reward, 3),
+                "energy_penalty": round(energy_penalty, 3),
+                "anomaly_penalty": round(anomaly_penalty, 3)
+            },
+            "cumulative_status": status
+        }
     }
     
     return history, df, df, df, json_state, status
@@ -99,16 +152,13 @@ def batch_simulate(irrigation, target_temp, ext_temp, history):
     base_time = datetime.datetime.now()
     
     for i in range(5):
-        # TIME TRAVEL: Add 1 minute to each step so the graph has distinct X-axis points!
         step_time = (base_time + datetime.timedelta(minutes=i)).strftime("%H:%M:%S")
         history, df, p1, p2, json_state, status = simulate_core(curr_irrigation, curr_target, ext_temp, history, override_time=step_time)
-        
         curr_target += random.uniform(-0.5, 0.5)
         curr_irrigation = max(0.0, min(1.0, curr_irrigation + random.uniform(-0.05, 0.05)))
         
     return history, df, df, df, json_state, status
 
-# Build the UI
 with gr.Blocks() as demo:
     session_history = gr.State([])
     
