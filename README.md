@@ -7,14 +7,6 @@ sdk: docker
 pinned: false
 ---
 
----
-title: OpenEnv Smart Greenhouse
-emoji: 🌿
-colorFrom: green
-colorTo: emerald
-sdk: docker
-pinned: false
----
 
 # 🌿 OpenEnv: Smart Greenhouse Digital Twin (Phantom Tenant Architecture)
 
