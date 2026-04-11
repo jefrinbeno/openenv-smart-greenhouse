@@ -15,219 +15,108 @@ pinned: false
 
 ## 🎥 [Click Here to Watch the 60-Second Demo Video](INSERT_YOUR_YOUTUBE_LINK_HERE)
 
-## 📖 Table of Contents
-1. [Executive Summary](#executive-summary)
-2. [Core Features & Innovations](#core-features--innovations)
-3. [Deep-Dive Repository Architecture](#deep-dive-repository-architecture)
-4. [Mathematical Formulations & Physics Engine](#mathematical-formulations--physics-engine)
-5. [Markov Decision Process (MDP) Definition](#markov-decision-process-mdp-definition)
-6. [Phase 2 Validation & Dual-Headed API](#phase-2-validation--dual-headed-api)
-7. [API Reference Schemas](#api-reference-schemas)
-8. [Testing & Quality Assurance](#testing--quality-assurance)
-9. [Deployment & Installation Guide](#deployment--installation-guide)
-10. [Team Credits](#team-credits)
-
 ---
 
-## 1. Executive Summary
+## 📂 Comprehensive Repository Architecture
 
-An enterprise-grade, mathematically grounded Reinforcement Learning (RL) environment built for the OpenEnv x Scaler Hackathon 2026. This project simulates a highly responsive Smart Greenhouse utilizing a "Phantom Tenant" architecture. 
+The codebase is strictly modularized to separate core physics mathematical engines from the API routing and UI components. This ensures maximum testability and compliance with the OpenEnv Phase 2 autograder.
 
-Moving beyond simple rule-based state changes, this environment provides continuous Markovian state evaluation, integrating real-world thermodynamic physics, agricultural yield models, dynamic energy market simulation, and a robust dual-headed API/UI deployment. It is built to rigorously test reinforcement learning agents on complex, multi-variable climate control optimization while punishing energy waste and anomalous behaviors.
-
----
-
-## 2. Core Features & Innovations
-
-* **Phantom Tenant Architecture:** A headless environment capable of running background simulations continuously without human intervention, acting as a "phantom" data generator.
-* **Dual-Headed API/UI Server:** Simultaneously hosts strict REST API endpoints for automated validation bots while serving a rich, interactive Gradio dashboard to human operators.
-* **Thermodynamic Physics Engine:** Calculates heat leakage, solar gain, and moisture evaporation using real-world constants rather than static multipliers.
-* **Vapor Pressure Deficit (VPD) Tracking:** Utilizes the Magnus-Tetens formula to determine the exact drying power of the air, directly influencing crop biomass yield.
-* **Gaussian Reward Models:** Prevents "reward hacking" by using continuous decay curves; agents are penalized heavily for moving out of the "Goldilocks" agricultural zones.
-
----
-
-## 3. Deep-Dive Repository Architecture
-
-The codebase is strictly modularized to separate core physics mathematical engines from the API routing and UI components. This ensures maximum testability, scalability, and compliance with the OpenEnv Phase 2 autograder.
-
-### Root Level Configurations
-* `openenv.yaml`: The crucial Phase 2 task manifest. Defines the environment schemas, valid action boundaries, and evaluation metrics. Uses string-path mapping to bypass Pydantic silent drops.
-* `inference.py`: Baseline RL agent execution script used by the autograder to validate Phase 1 and Phase 2 compliance.
-* `client.py` & `logic.py`: Local client test scripts and foundational interaction logic for manual agent testing prior to deployment.
-* `models.py`: Pydantic data models enforcing strict type-checking for all State, Action, and Observation JSON payloads to prevent injection or malformed data errors.
-* `pyproject.toml` & `uv.lock`: Modern, ultra-fast Python package management configurations ensuring deterministic dependency resolution.
-* `pytest.ini`: Configuration for the automated testing suite.
-
-### `greenhouse/` (The Core Physics & Domain Logic)
-* **`config/default.yaml`**: Stores universal environment constants (base insulation factors, optimal crop temperatures, maximum soil saturation, specific heat capacities).
-* **`core/physics.py`**: The thermodynamic and hydrological engine. Calculates continuous state transitions using Newton's Law of Cooling, moisture evaporation rates, and VPD logic.
-* **`core/weather.py`**: A stochastic environmental generator that simulates external disturbances such as diurnal temperature cycles and solar radiation (measured in W/m2).
-* **`core/energy.py`**: Calculates the HVAC Coefficient of Performance (COP) and tracks kW/h consumption based on the required thermal delta between the internal target and external reality.
-* **`core/market.py`**: Simulates dynamic energy pricing, penalizing the agent more heavily for utilizing high HVAC loads during peak external grid hours.
-* **`core/rewards.py`**: Contains the complex Gaussian decay models for calculating the continuous reward function, balancing crop yield against energy costs and system strain.
-
-### `greenhouse_package/` (RL Environment & Task Management)
-* `env.py`: The main Gym-like Reinforcement Learning Environment class. Orchestrates state transitions by calling the `core/` modules during `step()` and `reset()` execution.
-* `env_server.py`: The Dual-Headed Server. Mounts the Gradio Human-in-the-Loop UI directly onto the FastAPI application.
-* `tasks.py`: Contains custom grader logic mapped directly to the `openenv.yaml` schema requirements to satisfy the Scaler autograder without breaking the underlying physics engine.
-
-### `server/` & `tests/`
-* `server/app.py`: The primary Uvicorn entry point. Initializes the Dual-Headed Server and exposes the `/reset` and `/step` REST endpoints.
-* `server/Dockerfile`: Container instructions for identical replication across local machines, Scaler grading servers, and Hugging Face Spaces.
-* `tests/`: Contains `test_physics.py`, `test_endpoints.py`, and `test_rewards.py` to guarantee boundary condition safety and 200 OK JSON compliance.
-
----
-
-## 4. Mathematical Formulations & Physics Engine
-
-This environment is designed to prevent "reward hacking" through strict physical clamps and continuous dynamic tracking. Instead of static if/else responses, the state is strictly Markovian.
-
-### Thermodynamics & Heat Transfer
-Internal greenhouse temperature is dictated by the agent's target setting, the external weather, and the structural insulation. We apply a modified Newton’s Law of Cooling integrated with solar gain.
-
-[ T_new = T_old + (HVAC_Efficiency * (T_target - T_old)) + (Insulation_Leak * (T_external - T_old)) + (Solar_Gain_Multiplier * Solar_Radiation) ]
-
-### Hydrology & Vapor Pressure Deficit (VPD)
-VPD is the critical agricultural metric measuring the drying power of the air. It dictates plant transpiration and nutrient uptake. We calculate it continuously using the Magnus-Tetens approximation.
-
-1. Calculate Saturation Vapor Pressure (e_s):
-[ e_s = 0.6108 * exp( (17.27 * T_actual) / (T_actual + 237.3) ) ]
-
-2. Calculate the VPD using the actual internal humidity (H):
-[ VPD = e_s * (1 - (H_actual / 100)) ]
-
-### HVAC Energy Consumption & COP
-Energy usage scales dynamically based on the delta between internal and external temperatures. The Coefficient of Performance (COP) degrades as the required temperature differential increases.
-
-[ COP = max(1.5, 4.0 - 0.05 * abs(T_external - T_target)) ]
-
-Total energy consumed in kWh per step utilizes the volume of the greenhouse, air density, and specific heat capacity divided by the dynamic COP.
-
----
-
-## 5. Markov Decision Process (MDP) Definition
-
-| Space Type | Dimension Name | Min Value | Max Value | Unit | Description |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Action** | Irrigation Flow | 0.0 | 1.0 | L/min | Controls water delivered to the soil. |
-| **Action** | Target Temp | 15.0 | 35.0 | Celsius | The desired temperature the HVAC attempts to reach. |
-| **Action** | Target Humidity | 30.0 | 90.0 | Percent | The desired moisture level in the air. |
-| **Observation** | Internal Temp | 0.0 | 50.0 | Celsius | Actual temperature resulting from physics engine. |
-| **Observation** | Internal Humid | 0.0 | 100.0 | Percent | Actual humidity resulting from evaporation models. |
-| **Observation** | Soil Moisture | 0.0 | 100.0 | Percent | Current water retention in the agricultural bed. |
-| **Observation** | External Temp | -10.0 | 45.0 | Celsius | Weather disturbance data from the stochastic generator. |
-| **Observation** | Solar Radiation | 0.0 | 1200.0 | W/m2 | Sunlight intensity impacting heat and evaporation. |
-| **Observation** | Current VPD | 0.0 | 5.0 | kPa | The calculated drying power of the air. |
-| **Observation** | Biomass Yield | 0.0 | Infinity | kg | Cumulative crop growth based on sustained optimal states. |
-
-### The "Goldilocks" Reward Function
-To ensure the agent optimizes for perfect climate control while minimizing energy waste, the reward utilizes a continuous Gaussian decay model. The agent receives maximum reward for maintaining variables near the optimal target, but takes dynamic penalties for energy waste and market pricing.
-
-[ Reward = Sum(Gaussian_Decay(Temp, Humid, Moisture)) - (Energy_Weight * kWh * Market_Price) - Anomaly_Penalty ]
-
----
-
-## 6. Phase 2 Validation & Dual-Headed API
-
-To satisfy the strict automated validation schema without sacrificing the complex Human UI, this project utilizes a **Dual-Headed Routing Strategy** inside `env_server.py`.
-
-1. **The Autograder API:** The server hosts hidden POST routes. These intercept incoming JSON requests from the Scaler validation bot and return exact schema-compliant responses.
-2. **The Schema Bypass:** The custom `tasks.py` file allows string-path mapping to bypass Pydantic silent drops that typically cause validation errors in standard evaluations.
-3. **The UI Overlay:** A customized Gradio Blocks interface is explicitly mounted onto the FastAPI app via `gr.mount_gradio_app()`. This takes over the root `/` path, providing human operators a visual command center.
-
----
-
-## 7. API Reference Schemas
-
-To interact programmatically with the environment backend, the RL agent must adhere strictly to these JSON structures.
-
-### POST `/reset`
-Initializes a new episode and returns the baseline state.
-**Request Payload:**
-```json
-{}
-```
-**Response Payload (200 OK):**
-```json
-{
-  "observation": [22.5, 60.0, 45.0, 20.0, 400.0, 1.1, 0.0],
-  "info": {
-    "status": "Environment reset successful",
-    "episode_id": "ep_987654321"
-  }
-}
-```
-
-### POST `/step`
-Advances the environment by one timestep based on the agent's actions.
-**Request Payload:**
-```json
-{
-  "action": {
-    "irrigation": 0.5,
-    "target_temp": 24.0,
-    "target_humidity": 65.0
-  }
-}
-```
-**Response Payload (200 OK):**
-```json
-{
-  "observation": [23.1, 62.0, 48.0, 21.0, 420.0, 1.05, 0.02],
-  "reward": 0.84,
-  "terminated": false,
-  "truncated": false,
-  "info": {
-    "energy_kwh": 1.2,
-    "market_cost": 0.15,
-    "anomalies_detected": 0
-  }
-}
+```text
+openenv-smart-greenhouse/
+├── .github/workflows/
+│   └── sync_to_hf.yml          # Automated CI/CD to Hugging Face
+├── greenhouse/                 # Research-Grade Digital Twin Logic
+│   ├── config/
+│   │   └── default.yaml        # Universal Environmental Constants
+│   └── core/
+│       ├── energy.py           # HVAC Thermodynamics & COP Logic
+│       ├── market.py           # Dynamic Energy Pricing Models
+│       ├── physics.py          # Heat Transfer & Hydrology Engine
+│       ├── rewards.py          # Gaussian Multi-Objective Rewards
+│       └── weather.py          # Stochastic Diurnal Disturbance Gen
+├── greenhouse_package/         # API & Autograder Integration
+│   ├── env.py                  # Main RL Environment Orchestrator
+│   ├── env_server.py           # Dual-Headed (FastAPI + Gradio)
+│   └── tasks.py                # Autograder Schema Path-Mapping
+├── server/                     # Production Deployment Layer
+│   ├── app.py                  # Uvicorn Entry Point (ASGI)
+│   └── Dockerfile              # Multi-Stage Containerization
+├── tests/                      # Enterprise Quality Assurance
+│   ├── test_endpoints.py       # REST API Handshake Validation
+│   ├── test_physics.py         # Thermodynamic Boundary Tests
+│   └── test_rewards.py         # Reward-Hacking Prevention Tests
+├── openenv.yaml                # Phase 2 Task Manifest (Pydantic Mapped)
+├── inference.py                # Scaler Validation Agent
+└── requirements.txt            # Dependency Matrix
 ```
 
 ---
 
-## 8. Testing & Quality Assurance
+## 🧠 Mathematical Formulations & Physics Engine
 
-The `tests/` directory utilizes `pytest` to guarantee system stability prior to deployment.
-* `test_physics.py`: Asserts that Newton's Law of Cooling correctly pushes internal temperatures toward external temperatures when HVAC is disabled. Validates VPD calculations against known psychrometric chart values.
-* `test_endpoints.py`: Spins up a local `TestClient` to bombard the FastAPI server with malformed JSON, asserting that Pydantic models correctly reject them while validating perfect inputs.
-* `test_rewards.py`: Injects boundary conditions (e.g., 50C internal temp) to assert that the Gaussian decay models successfully drop the reward to 0 and apply maximum energy penalties.
+Our environment utilizes continuous Markovian state evaluations grounded in actual thermodynamic and agricultural science.
+
+### 1. Thermodynamic Heat Transfer (`physics.py`)
+We simulate internal temperature fluctuations ($T$) using a modified Newton’s Law of Cooling, integrated with solar radiation ($S$) and HVAC thermal work.
+$$T_{t+1} = T_t + \alpha_{hvac}(T_{target} - T_t) + \beta_{insulation}(T_{ext} - T_t) + \gamma \cdot S_t$$
+
+### 2. Vapor Pressure Deficit (VPD) Logic
+VPD is the critical agricultural metric measuring the drying power of the air. We derive it using the **Magnus-Tetens** formula for Saturation Vapor Pressure ($e_s$):
+$$e_s = 0.6108 \cdot \exp\left(\frac{17.27 \cdot T_{actual}}{T_{actual} + 237.3}\right)$$
+
+The final VPD is then calculated relative to internal humidity ($H$):
+$$VPD = e_s \cdot \left(1 - \frac{H_{actual}}{100}\right)$$
+
+### 3. HVAC Coefficient of Performance (COP) & Energy
+Energy usage scales dynamically based on the thermal delta. The COP degrades non-linearly as the environment reaches extreme differentials:
+$$COP = \max(1.5, 4.0 - 0.05 \cdot |T_{ext} - T_{target}|)$$
+
+Total energy consumption ($E_t$) in kWh is derived from the work required to shift air mass density ($\rho$) across a specific heat capacity ($C_p$):
+$$E_t = \frac{|T_{t+1} - T_t| \cdot V \cdot \rho \cdot C_p}{COP \cdot 3600}$$
 
 ---
 
-## 9. Deployment & Installation Guide
+## ⚙️ Markov Decision Process (MDP) Definition
 
-### 1. Local Deployment (Docker)
-The easiest way to run the full environment, including the Human UI and the API endpoints, is via the provided `Dockerfile`.
+### The Observation Space ($S$)
+A continuous vector tracking 7 critical environmental dimensions provided to the agent at each timestep:
+$$S = [T_{int}, H_{int}, M_{soil}, T_{ext}, S_{rad}, VPD, B_{mass}]$$
 
+### The "Goldilocks" Reward Function ($R$)
+The agent is optimized via a multi-objective Gaussian decay function. This ensures the agent is rewarded for staying in optimal agricultural zones while being penalized for energy expenditure ($E_t$) and grid costs ($P_t$).
+$$R_t = \sum_{i \in \{T, H, M\}} \exp\left(-\frac{(x_i - \mu_i)^2}{2\sigma_i^2}\right) - (w_E \cdot E_t \cdot P_t) - \text{Penalty}_{anomaly}$$
+
+---
+
+## 🛡️ Phase 2 Validation & Dual-Headed Routing
+
+To satisfy the strict automated validation schema without sacrificing the complex Human UI, this project utilizes a **Dual-Headed Routing Strategy** inside `env_server.py`:
+
+1. **The Autograder API:** Hidden `@app.post("/reset")` and `@app.post("/step")` routes handle strict JSON handshakes for the Scaler bot, returning 200 OK responses with exact Pydantic-validated payloads.
+2. **The Schema Bypass:** The `openenv.yaml` utilizes string-path mapping to `tasks.py`, bypassing typical Pydantic drops during Phase 2 evaluation.
+3. **The UI Overlay:** A customized Gradio interface is mounted directly onto the FastAPI instance via `gr.mount_gradio_app()`. This provides a visual command center for humans while the bot communicates with the backend via REST.
+
+---
+
+## 🚀 Deployment & Installation
+
+### Local Docker Build
 ```bash
-git clone [https://github.com/jefrinbeno/openenv-smart-greenhouse.git](https://github.com/jefrinbeno/openenv-smart-greenhouse.git)
-cd openenv-smart-greenhouse
 docker build -t greenhouse-env .
 docker run -p 7860:7860 greenhouse-env
 ```
 
-### 2. Direct Python Execution (Development Mode)
-For rapid development and testing without containerization. 
-
+### Direct Python Execution
 ```bash
 pip install -r requirements.txt
-python -m uvicorn server.app:app --host 0.0.0.0 --port 7860 --reload
+python -m uvicorn server.app:app --host 0.0.0.0 --port 7860
 ```
 
-### 3. Automated Hugging Face CI/CD
-Code pushed to the `main` branch of this repository automatically triggers a GitHub Action. This pipeline pushes the latest changes directly to the Hugging Face Space via API tokens, ensuring the live demo is always in sync with the codebase.
+### Interface Endpoints
+* **Human Dashboard:** `http://localhost:7860`
+* **RL API Endpoint:** `POST http://localhost:7860/step`
 
 ---
-
-## 10. Team Credits
-
-Architected, Researched, and Developed by:
-* **Jefrin Beno J M** (Core Architecture & Backend Routing)
-* **Nandana Sajikumar** (Physics Engine & UI Integration)
-* **Hema Priya** (MDP Formulation & Testing)
-
-*Built for the OpenEnv x Scaler Hackathon 2026.*
+*Architected and Developed by Jefrin Beno J M, Nandana Sajikumar, and Hema Priya for the OpenEnv x Scaler Hackathon 2026.*
 ```
+
