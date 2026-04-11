@@ -1,12 +1,12 @@
 name: "openenv-smart-greenhouse"
 version: "1.0.0"
 tasks:
-  - id: "task1"
-    name: "Temperature"
+  - id: "task_temperature"
+    name: "Temperature Regulation"
     grader: true
-  - id: "task2"
-    name: "Humidity"
+  - id: "task_humidity"
+    name: "Humidity Stabilization"
     grader: true
-  - id: "task3"
-    name: "Resources"
+  - id: "task_resources"
+    name: "Resource Efficiency"
     grader: true
