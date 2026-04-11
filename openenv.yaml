@@ -1,12 +1,9 @@
 name: "openenv-smart-greenhouse"
 version: "1.0.0"
 tasks:
-  - id: "temp_control"
-    path: "tasks/temp_control.py"
+  - id: "temp_task"
     grader: true
-  - id: "hum_control"
-    path: "tasks/hum_control.py"
+  - id: "hum_task"
     grader: true
-  - id: "res_mgmnt"
-    path: "tasks/res_mgmnt.py"
+  - id: "res_task"
     grader: true
