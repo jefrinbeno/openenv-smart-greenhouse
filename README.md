@@ -1,3 +1,12 @@
+---
+title: OpenEnv Smart Greenhouse
+emoji: 🌿
+colorFrom: green
+colorTo: emerald
+sdk: docker
+pinned: false
+---
+
 # 🌿 OpenEnv: Smart Greenhouse Digital Twin (Phantom Tenant Architecture)
 
 ![Phase 2 Validation](https://img.shields.io/badge/OpenEnv_Scaler-Phase_2_PASSED-success)
