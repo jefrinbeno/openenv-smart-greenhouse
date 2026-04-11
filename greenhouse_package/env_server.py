@@ -27,43 +27,59 @@ async def health():
 
 def get_empty_df():
     return pd.DataFrame(columns=[
-        "Time", "Target Temp (°C)", "Actual Temp (°C)", 
-        "Irrigation Level", "Soil Moisture (%)", "Energy (kWh)", "Anomaly Score", "Reward"
+        "Time", "Target Temp (°C)", "Ext Temp (°C)", "Actual Temp (°C)", 
+        "Irrigation", "Moisture (%)", "Energy (kWh)", "Anomaly", "Reward"
     ])
 
 def reset_simulation():
     empty_df = get_empty_df()
-    return [], empty_df, empty_df, empty_df, {}, "System Reset. Awaiting Initialization..."
+    return [], empty_df, empty_df, empty_df, {}, "🟢 System Reset. Awaiting Initialization..."
 
-def simulate_step(irrigation, target_temp, history):
+def simulate_core(irrigation, target_temp, ext_temp, history):
     now = datetime.datetime.now().strftime("%H:%M:%S")
     
-    # Physics & Environment Simulation
-    actual_temp = target_temp + (random.random() * 2 - 1.0)
-    soil_moisture = 20 + (irrigation * 70) + (random.random() * 5 - 2.5)
-    energy_used = abs(24.0 - target_temp) * 1.5 + (irrigation * 2.0) + random.uniform(0.1, 0.5)
+    # Enhanced Physics Simulation (External Temp now affects Internal Temp)
+    actual_temp = (target_temp * 0.7) + (ext_temp * 0.3) + random.uniform(-0.8, 0.8)
+    soil_moisture = 15 + (irrigation * 75) + random.uniform(-2.0, 2.0)
+    energy_used = abs(actual_temp - target_temp) * 1.8 + (irrigation * 2.5) + random.uniform(0.1, 0.4)
     
-    anomaly_risk = random.uniform(0.01, 0.05) if 18 <= target_temp <= 28 else random.uniform(0.6, 0.9)
-    status = "Optimal" if 20 <= actual_temp <= 28 and anomaly_risk < 0.5 else "Warning: Suboptimal Climate"
-    reward = 0.95 if status == "Optimal" else 0.45
+    anomaly_risk = random.uniform(0.01, 0.08) if 18 <= target_temp <= 28 else random.uniform(0.5, 0.95)
+    
+    # Dynamic Status Alerts
+    if anomaly_risk > 0.7:
+        status = "🔴 CRITICAL: High Behavior Anomaly Risk Detected!"
+        reward = 0.30
+    elif 20 <= actual_temp <= 28:
+        status = "🟢 Optimal Operation"
+        reward = 0.95
+    else:
+        status = "🟠 Warning: Suboptimal Climate Diagnostics"
+        reward = 0.65
 
     new_record = {
         "Time": now,
         "Target Temp (°C)": float(target_temp),
+        "Ext Temp (°C)": float(ext_temp),
         "Actual Temp (°C)": round(actual_temp, 2),
-        "Irrigation Level": float(irrigation),
-        "Soil Moisture (%)": round(soil_moisture, 2),
+        "Irrigation": round(float(irrigation), 2),
+        "Moisture (%)": round(soil_moisture, 2),
         "Energy (kWh)": round(energy_used, 2),
-        "Anomaly Score": round(anomaly_risk, 3),
+        "Anomaly": round(anomaly_risk, 3),
         "Reward": reward
     }
     
     history.append(new_record)
+    
+    # Limit history to prevent browser memory lag during long sessions
+    if len(history) > 50:
+        history = history[-50:]
+        
     df = pd.DataFrame(history)
     
     json_state = {
         "timestamp": now,
         "action_space": {"irrigation": irrigation, "target_temp": target_temp},
+        "environment_factors": {"external_temp": ext_temp},
         "observation_space": {
             "actual_temp": round(actual_temp, 2),
             "soil_moisture": round(soil_moisture, 2),
@@ -75,52 +91,77 @@ def simulate_step(irrigation, target_temp, history):
     
     return history, df, df, df, json_state, status
 
+def simulate_single(irrigation, target_temp, ext_temp, history):
+    return simulate_core(irrigation, target_temp, ext_temp, history)
+
+def batch_simulate(irrigation, target_temp, ext_temp, history):
+    # Simulates 5 sequential steps to rapidly build graph curves
+    curr_irrigation = irrigation
+    curr_target = target_temp
+    for _ in range(5):
+        history, df, p1, p2, json_state, status = simulate_core(curr_irrigation, curr_target, ext_temp, history)
+        # Add slight drift to inputs to make the graph curves look organic
+        curr_target += random.uniform(-0.5, 0.5)
+        curr_irrigation = max(0.0, min(1.0, curr_irrigation + random.uniform(-0.05, 0.05)))
+    return history, df, df, df, json_state, status
+
 # Build the UI
-with gr.Blocks() as demo:
+with gr.Blocks(theme=gr.themes.Soft(primary_hue="emerald")) as demo:
     session_history = gr.State([])
     
-    gr.Markdown("# 🌿 OpenEnv: Smart Greenhouse Digital Twin")
-    gr.Markdown("### Interactive Reinforcement Learning Environment & Telemetry Dashboard")
+    gr.Markdown("""
+    # 🌿 OpenEnv: Enterprise Smart Greenhouse Digital Twin
+    ### AI-Driven Climate Control & Reinforcement Learning Telemetry
+    """)
     
-    # REMOVED wrap=True HERE:
-    with gr.Row():
+    sys_status = gr.Textbox(label="System Diagnostics & ML Alerts", value="🟢 Awaiting Initialization...", interactive=False)
+
+    # ACCORDION LAYOUT: Allows Controls to collapse, giving full screen to Data
+    with gr.Accordion("🎛️ Environment Configuration & Agent Controls", open=True):
+        with gr.Row():
+            with gr.Column():
+                gr.Markdown("**Agent Action Space**")
+                irrigation_slider = gr.Slider(0.0, 1.0, 0.5, step=0.05, label="Irrigation Flow Rate")
+                temp_slider = gr.Slider(15.0, 35.0, 24.0, step=0.5, label="Target Internal Temp (°C)")
+            with gr.Column():
+                gr.Markdown("**External Disturbances**")
+                ext_temp_slider = gr.Slider(5.0, 45.0, 22.0, step=1.0, label="External Weather Temp (°C)")
         
-        with gr.Column(scale=1, min_width=320):
-            gr.Markdown("### 🎛️ Agent Action Space")
-            with gr.Group():
-                irrigation_slider = gr.Slider(minimum=0.0, maximum=1.0, value=0.5, step=0.05, label="Irrigation Flow Rate")
-                temp_slider = gr.Slider(minimum=15.0, maximum=35.0, value=24.0, step=0.5, label="Target Temperature (°C)")
-            
+        with gr.Row():
+            step_btn = gr.Button("▶ Execute Single Step", variant="primary")
+            batch_btn = gr.Button("⏩ Batch Simulate (5 Steps)", variant="primary")
+            reset_btn = gr.Button("🔄 Reset System", variant="secondary")
+
+    # TABS FOR FULL-WIDTH VISUALIZATIONS
+    with gr.Tabs():
+        with gr.Tab("📈 Live Telemetry Graphs"):
             with gr.Row():
-                step_btn = gr.Button("▶ Execute Step", variant="primary")
-                reset_btn = gr.Button("🔄 Reset System", variant="secondary")
-                
-            sys_status = gr.Textbox(label="Agent Environment Status", value="Awaiting Initialization...")
+                temp_plot = gr.LinePlot(x="Time", y="Actual Temp (°C)", title="Internal Atmospheric Temperature")
+                moist_plot = gr.LinePlot(x="Time", y="Moisture (%)", title="Soil Moisture Content")
+        
+        with gr.Tab("🗄️ Tabular Data Matrix"):
+            telemetry_table = gr.Dataframe(interactive=False)
+        
+        with gr.Tab("🧩 Raw JSON & ML Diagnostics"):
+            json_output = gr.JSON()
 
-        with gr.Column(scale=2, min_width=500):
-            with gr.Tabs():
-                with gr.Tab("📈 Live Telemetry Graphs"):
-                    gr.Markdown("Real-time environmental response tracking.")
-                    temp_plot = gr.LinePlot(x="Time", y="Actual Temp (°C)", title="Atmospheric Temperature Over Time")
-                    moist_plot = gr.LinePlot(x="Time", y="Soil Moisture (%)", title="Soil Moisture Over Time")
-                
-                with gr.Tab("🗄️ Tabular Data Matrix"):
-                    telemetry_table = gr.Dataframe(headers=["Time", "Target Temp (°C)", "Actual Temp (°C)", "Irrigation Level", "Soil Moisture (%)", "Energy (kWh)", "Anomaly Score", "Reward"], interactive=False)
-                
-                with gr.Tab("🧩 Raw JSON & ML Diagnostics"):
-                    json_output = gr.JSON(label="OpenEnv Environment State Array")
-
-    # Event Listeners
+    # Event Mapping
     step_btn.click(
-        fn=simulate_step,
-        inputs=[irrigation_slider, temp_slider, session_history],
-        outputs=[session_history, telemetry_table, temp_plot, moist_plot, json_output, sys_status]
+        simulate_single, 
+        [irrigation_slider, temp_slider, ext_temp_slider, session_history],
+        [session_history, telemetry_table, temp_plot, moist_plot, json_output, sys_status]
+    )
+    
+    batch_btn.click(
+        batch_simulate, 
+        [irrigation_slider, temp_slider, ext_temp_slider, session_history],
+        [session_history, telemetry_table, temp_plot, moist_plot, json_output, sys_status]
     )
     
     reset_btn.click(
-        fn=reset_simulation,
-        inputs=[],
-        outputs=[session_history, telemetry_table, temp_plot, moist_plot, json_output, sys_status]
+        reset_simulation, 
+        [],
+        [session_history, telemetry_table, temp_plot, moist_plot, json_output, sys_status]
     )
 
 # Mount the UI onto the FastAPI app
