@@ -25,7 +25,6 @@ async def health():
 # 🌿 PART 2: ENTERPRISE UI (FOR HUMAN JUDGES)
 # ==========================================
 
-# Initialize empty dataframe for the graphs
 def get_empty_df():
     return pd.DataFrame(columns=[
         "Time", "Target Temp (°C)", "Actual Temp (°C)", 
@@ -34,7 +33,8 @@ def get_empty_df():
 
 def reset_simulation():
     empty_df = get_empty_df()
-    return [], empty_df, empty_df, "{}", "System Reset. Awaiting Initialization..."
+    # Added the extra empty_df for the second plot!
+    return [], empty_df, empty_df, empty_df, {}, "System Reset. Awaiting Initialization..."
 
 def simulate_step(irrigation, target_temp, history):
     now = datetime.datetime.now().strftime("%H:%M:%S")
@@ -44,10 +44,8 @@ def simulate_step(irrigation, target_temp, history):
     soil_moisture = 20 + (irrigation * 70) + (random.random() * 5 - 2.5)
     energy_used = abs(24.0 - target_temp) * 1.5 + (irrigation * 2.0) + random.uniform(0.1, 0.5)
     
-    # ML Anomaly Detection Mock
     anomaly_risk = random.uniform(0.01, 0.05) if 18 <= target_temp <= 28 else random.uniform(0.6, 0.9)
-    
-    status = "Optimal" if 20 <= actual_temp <= 28 and anomaly_risk < 0.5 else "Warning: Suboptimal Climate / High Anomaly Risk"
+    status = "Optimal" if 20 <= actual_temp <= 28 and anomaly_risk < 0.5 else "Warning: Suboptimal Climate"
     reward = 0.95 if status == "Optimal" else 0.45
 
     new_record = {
@@ -64,7 +62,6 @@ def simulate_step(irrigation, target_temp, history):
     history.append(new_record)
     df = pd.DataFrame(history)
     
-    # JSON State Output
     json_state = {
         "timestamp": now,
         "action_space": {"irrigation": irrigation, "target_temp": target_temp},
@@ -77,18 +74,21 @@ def simulate_step(irrigation, target_temp, history):
         "rl_metrics": {"step_reward": reward, "cumulative_status": status}
     }
     
-    return history, df, df, json_state, status
+    # Return 'df' an extra time so both temp_plot AND moist_plot get data
+    return history, df, df, df, json_state, status
 
-# Build the UI (Removed theme arg to fix the warning)
+# Build the UI
 with gr.Blocks() as demo:
     session_history = gr.State([])
     
     gr.Markdown("# 🌿 OpenEnv: Smart Greenhouse Digital Twin")
     gr.Markdown("### Interactive Reinforcement Learning Environment & Telemetry Dashboard")
     
-    with gr.Row():
-        # LEFT COLUMN: CONTROLS
-        with gr.Column(scale=1):
+    # Wrap=True helps with responsiveness overall
+    with gr.Row(wrap=True):
+        
+        # min_width ensures it doesn't squish too much before wrapping underneath
+        with gr.Column(scale=1, min_width=320):
             gr.Markdown("### 🎛️ Agent Action Space")
             with gr.Group():
                 irrigation_slider = gr.Slider(minimum=0.0, maximum=1.0, value=0.5, step=0.05, label="Irrigation Flow Rate")
@@ -100,12 +100,11 @@ with gr.Blocks() as demo:
                 
             sys_status = gr.Textbox(label="Agent Environment Status", value="Awaiting Initialization...")
 
-        # RIGHT COLUMN: VISUALIZATIONS
-        with gr.Column(scale=2):
+        # min_width forces the graphs to stay readable
+        with gr.Column(scale=2, min_width=500):
             with gr.Tabs():
                 with gr.Tab("📈 Live Telemetry Graphs"):
                     gr.Markdown("Real-time environmental response tracking.")
-                    # Removed width and height parameters to fix the TypeError
                     temp_plot = gr.LinePlot(x="Time", y="Actual Temp (°C)", title="Atmospheric Temperature Over Time")
                     moist_plot = gr.LinePlot(x="Time", y="Soil Moisture (%)", title="Soil Moisture Over Time")
                 
@@ -115,17 +114,17 @@ with gr.Blocks() as demo:
                 with gr.Tab("🧩 Raw JSON & ML Diagnostics"):
                     json_output = gr.JSON(label="OpenEnv Environment State Array")
 
-    # Event Listeners
+    # Linked BOTH plots into the outputs array!
     step_btn.click(
         fn=simulate_step,
         inputs=[irrigation_slider, temp_slider, session_history],
-        outputs=[session_history, telemetry_table, temp_plot, json_output, sys_status]
+        outputs=[session_history, telemetry_table, temp_plot, moist_plot, json_output, sys_status]
     )
     
     reset_btn.click(
         fn=reset_simulation,
         inputs=[],
-        outputs=[session_history, telemetry_table, temp_plot, json_output, sys_status]
+        outputs=[session_history, telemetry_table, temp_plot, moist_plot, json_output, sys_status]
     )
 
 # Mount the UI onto the FastAPI app
