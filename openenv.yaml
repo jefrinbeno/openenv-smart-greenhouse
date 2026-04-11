@@ -3,10 +3,10 @@ version: "1.0.0"
 tasks:
   - id: "task_temperature"
     name: "Temperature Regulation"
-    grader: true
+    grader: "tasks:grade_temp"
   - id: "task_humidity"
     name: "Humidity Stabilization"
-    grader: true
+    grader: "tasks:grade_hum"
   - id: "task_resources"
     name: "Resource Efficiency"
-    grader: true
+    grader: "tasks:grade_res"
