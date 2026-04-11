@@ -4,6 +4,7 @@ import pandas as pd
 import datetime
 import random
 import math
+import os
 
 app = FastAPI()
 
@@ -23,195 +24,160 @@ async def health():
     return {"status": "running"}
 
 # ==========================================
-# 🌿 PART 2: ENTERPRISE UI (FOR HUMAN JUDGES)
+# 🌿 PART 2: COMMAND CENTER UI & PHYSICS
 # ==========================================
 
 def get_empty_df():
     return pd.DataFrame(columns=[
-        "Time", "Target Temp (°C)", "Ext Temp (°C)", "Actual Temp (°C)", 
-        "Irrigation", "Moisture (%)", "Energy (kWh)", "Anomaly", "Reward"
+        "Time", "Target T (°C)", "Ext T (°C)", "Solar (W/m²)", 
+        "Actual T (°C)", "Moisture (%)", "Humidity (%)", "VPD (kPa)", 
+        "Energy (kWh)", "Biomass (g)", "Reward"
     ])
 
 def reset_simulation():
     empty_df = get_empty_df()
-    return [], empty_df, empty_df, empty_df, {}, "🟢 System Reset. Awaiting Initialization..."
+    return [], empty_df, empty_df, empty_df, empty_df, empty_df, {}, "🟢 System Reset. Biomass cleared."
 
-def simulate_core(irrigation, target_temp, ext_temp, history, override_time=None):
+def simulate_core(irrigation, target_temp, target_hum, ext_temp, solar_rad, history, override_time=None):
     now = override_time if override_time else datetime.datetime.now().strftime("%H:%M:%S")
     
-    # Extract Previous State (Markov Property)
+    # Extract Previous State
     if len(history) > 0:
-        prev_temp = history[-1]["Actual Temp (°C)"]
+        prev_temp = history[-1]["Actual T (°C)"]
         prev_moist = history[-1]["Moisture (%)"]
+        prev_hum = history[-1]["Humidity (%)"]
+        prev_biomass = history[-1]["Biomass (g)"]
     else:
-        prev_temp = 24.0 # Initial baseline
-        prev_moist = 40.0 # Initial baseline
+        prev_temp, prev_moist, prev_hum, prev_biomass = 24.0, 50.0, 60.0, 10.0
 
-    # 1. MATHEMATICAL CLAMPING (Action Bounds)
+    # 1. CLAMPING
     irrigation = max(0.0, min(1.0, float(irrigation)))
-    target_temp = max(10.0, min(40.0, float(target_temp)))
-    ext_temp = float(ext_temp)
+    target_temp = max(15.0, min(35.0, float(target_temp)))
+    target_hum = max(30.0, min(90.0, float(target_hum)))
     
-    # 2. THERMODYNAMIC PHYSICS MODEL
-    insulation_factor = 0.05  # Heat leak to external environment
-    hvac_power = 0.35         # HVAC cooling/heating rate
-    
+    # 2. THERMODYNAMICS & SOLAR GAIN
+    solar_heat_gain = (solar_rad / 1000.0) * 1.5
+    hvac_power = 0.4
     delta_hvac = hvac_power * (target_temp - prev_temp)
-    delta_ext = insulation_factor * (ext_temp - prev_temp)
-    actual_temp = prev_temp + delta_hvac + delta_ext + random.uniform(-0.2, 0.2)
+    delta_ext = 0.05 * (ext_temp - prev_temp)
     
-    # 3. HYDROLOGY MODEL (Evapotranspiration)
-    evap_rate = 0.15 * (actual_temp / 24.0) # Evaporates faster when hotter
-    moisture_added = irrigation * 15.0      # Pump volume
-    soil_moisture = prev_moist - evap_rate + moisture_added + random.uniform(-0.5, 0.5)
+    actual_temp = prev_temp + delta_hvac + delta_ext + solar_heat_gain + random.uniform(-0.1, 0.1)
     
-    # State Observation Clamping (Physics limits)
-    actual_temp = max(-10.0, min(60.0, actual_temp))
+    # 3. HYDROLOGY & HUMIDITY
+    evap_rate = 0.2 * (actual_temp / 24.0) + (solar_rad / 2000.0)
+    soil_moisture = prev_moist - evap_rate + (irrigation * 12.0) + random.uniform(-0.3, 0.3)
+    
+    # Humidity follows target but is influenced by irrigation evaporation
+    actual_hum = prev_hum + 0.3 * (target_hum - prev_hum) + (irrigation * 2.0) - (delta_hvac * 0.5)
+    
+    actual_temp = max(0.0, min(50.0, actual_temp))
     soil_moisture = max(0.0, min(100.0, soil_moisture))
+    actual_hum = max(10.0, min(100.0, actual_hum))
     
-    # 4. ENERGY EXPENDITURE (Work done by HVAC and Pumps)
-    hvac_energy = abs(delta_hvac) * 1.8 
-    pump_energy = irrigation * 2.2
-    energy_used = hvac_energy + pump_energy + random.uniform(0.05, 0.15) # + Idle draw
+    # 4. VAPOR PRESSURE DEFICIT (VPD)
+    e_s = 0.6108 * math.exp((17.27 * actual_temp) / (actual_temp + 237.3))
+    vpd = e_s * (1.0 - (actual_hum / 100.0))
     
-    # ML Anomaly Risk Generation
-    anomaly_risk = random.uniform(0.01, 0.08) if 18 <= target_temp <= 28 else random.uniform(0.6, 0.98)
+    # 5. CROP BIOMASS YIELD MODEL
+    # Optimal growth happens at 24C, 60% Moisture, and VPD around 1.0 kPa
+    temp_growth = math.exp(-0.02 * ((actual_temp - 24.0) ** 2))
+    moist_growth = math.exp(-0.005 * ((soil_moisture - 60.0) ** 2))
+    vpd_growth = math.exp(-2.0 * ((vpd - 1.0) ** 2))
     
-    # 5. CONTINUOUS "GOLDILOCKS" REWARD FUNCTION
-    optimal_temp = 24.0
-    optimal_moist = 60.0
+    growth_rate = 0.5 * temp_growth * moist_growth * vpd_growth * (solar_rad / 500.0)
+    biomass = prev_biomass + growth_rate
     
-    # Gaussian curves for optimal state matching
-    temp_reward = math.exp(-0.05 * ((actual_temp - optimal_temp) ** 2))
-    moist_reward = math.exp(-0.005 * ((soil_moisture - optimal_moist) ** 2))
+    # 6. ENERGY MODEL WITH HVAC COP
+    cop = max(1.5, 4.0 - 0.05 * abs(ext_temp - target_temp))
+    hvac_energy = (abs(delta_hvac) * 2.5) / cop
+    energy_used = hvac_energy + (irrigation * 1.5) + random.uniform(0.05, 0.1)
     
-    # Linear penalties
-    energy_penalty = energy_used * 0.08
-    anomaly_penalty = anomaly_risk * 0.4
+    # 7. GRAND FINALE REWARD FUNCTION
+    anomaly_risk = random.uniform(0.01, 0.1) if 0.5 <= vpd <= 1.5 else random.uniform(0.5, 0.9)
+    reward = max(0.0, min(1.0, (0.8 * (growth_rate / 0.5)) - (0.05 * energy_used) - (0.3 * anomaly_risk)))
     
-    # Final Formula
-    raw_reward = (0.6 * temp_reward) + (0.4 * moist_reward) - energy_penalty - anomaly_penalty
-    reward = max(0.0, min(1.0, raw_reward)) # Bound final output
-    
-    # Dynamic Status Alerts
-    if anomaly_risk > 0.7:
-        status = "🔴 CRITICAL: Behavior Anomaly Risk Detected!"
-    elif reward >= 0.80:
-        status = "🟢 Optimal Operation (High Efficiency)"
-    elif reward >= 0.50:
-        status = "🟡 Acceptable Operation (Moderate Deviation/Drain)"
-    else:
-        status = "🟠 Warning: Suboptimal Climate or Extreme Resource Waste"
+    if anomaly_risk > 0.7: status = "🔴 CRITICAL: VPD Anomaly. Plant Stress Detected!"
+    elif reward >= 0.75: status = "🟢 Optimal Growth & Efficiency"
+    else: status = "🟡 Suboptimal: Check VPD or Energy Consumption"
 
     new_record = {
-        "Time": now,
-        "Target Temp (°C)": float(target_temp),
-        "Ext Temp (°C)": float(ext_temp),
-        "Actual Temp (°C)": round(actual_temp, 2),
-        "Irrigation": round(float(irrigation), 2),
-        "Moisture (%)": round(soil_moisture, 2),
-        "Energy (kWh)": round(energy_used, 2),
-        "Anomaly": round(anomaly_risk, 3),
-        "Reward": round(reward, 3) 
+        "Time": now, "Target T (°C)": float(target_temp), "Ext T (°C)": float(ext_temp),
+        "Solar (W/m²)": float(solar_rad), "Actual T (°C)": round(actual_temp, 2),
+        "Moisture (%)": round(soil_moisture, 2), "Humidity (%)": round(actual_hum, 2),
+        "VPD (kPa)": round(vpd, 3), "Energy (kWh)": round(energy_used, 2),
+        "Biomass (g)": round(biomass, 2), "Reward": round(reward, 3) 
     }
     
     history.append(new_record)
-    if len(history) > 50: history = history[-50:]
+    if len(history) > 60: history = history[-60:]
     df = pd.DataFrame(history)
     
     json_state = {
         "timestamp": now,
-        "action_space": {"irrigation": irrigation, "target_temp": target_temp},
-        "environment_factors": {"external_temp": ext_temp},
-        "observation_space": {
-            "actual_temp": round(actual_temp, 2),
-            "soil_moisture": round(soil_moisture, 2),
-            "energy_consumption_kwh": round(energy_used, 2)
-        },
-        "ml_diagnostics": {"behavior_anomaly_score": round(anomaly_risk, 3)},
-        "rl_metrics": {
-            "step_reward": round(reward, 3), 
-            "reward_breakdown": {
-                "temp_score": round(temp_reward, 3),
-                "moisture_score": round(moist_reward, 3),
-                "energy_penalty": round(energy_penalty, 3),
-                "anomaly_penalty": round(anomaly_penalty, 3)
-            },
-            "cumulative_status": status
-        }
+        "physics_engine": {"vpd_kpa": round(vpd, 3), "hvac_cop": round(cop, 2)},
+        "observation_space": new_record,
+        "rl_metrics": {"step_reward": round(reward, 3), "cumulative_status": status}
     }
     
-    return history, df, df, df, json_state, status
+    return history, df, df, df, df, df, json_state, status
 
-def simulate_single(irrigation, target_temp, ext_temp, history):
-    return simulate_core(irrigation, target_temp, ext_temp, history)
+def simulate_single(i, tt, th, et, sr, h):
+    return simulate_core(i, tt, th, et, sr, h)
 
-def batch_simulate(irrigation, target_temp, ext_temp, history):
-    curr_irrigation = irrigation
-    curr_target = target_temp
+def batch_simulate(i, tt, th, et, sr, h):
     base_time = datetime.datetime.now()
-    
-    for i in range(5):
-        step_time = (base_time + datetime.timedelta(minutes=i)).strftime("%H:%M:%S")
-        history, df, p1, p2, json_state, status = simulate_core(curr_irrigation, curr_target, ext_temp, history, override_time=step_time)
-        curr_target += random.uniform(-0.5, 0.5)
-        curr_irrigation = max(0.0, min(1.0, curr_irrigation + random.uniform(-0.05, 0.05)))
-        
-    return history, df, df, df, json_state, status
+    for j in range(6):
+        step_time = (base_time + datetime.timedelta(minutes=j)).strftime("%H:%M:%S")
+        h, df, p1, p2, p3, p4, json_state, status = simulate_core(i, tt, th, et, sr, h, override_time=step_time)
+        tt += random.uniform(-0.2, 0.2)
+        sr = max(0, min(1000, sr + random.uniform(-50, 50)))
+    return h, df, df, df, df, df, json_state, status
 
-with gr.Blocks() as demo:
+# UI Definition
+with gr.Blocks(theme=gr.themes.Base()) as demo:
     session_history = gr.State([])
     
-    gr.Markdown("""
-    # 🌿 OpenEnv: Enterprise Smart Greenhouse Digital Twin
-    ### AI-Driven Climate Control & Reinforcement Learning Telemetry
-    """)
-    
-    sys_status = gr.Textbox(label="System Diagnostics & ML Alerts", value="🟢 Awaiting Initialization...", interactive=False)
+    gr.Markdown("## 🌿 OpenEnv: Advanced Agricultural Digital Twin")
+    sys_status = gr.Textbox(label="Agent Status & Crop Health", value="🟢 Awaiting Initialization...", interactive=False)
 
-    with gr.Accordion("🎛️ Environment Configuration & Agent Controls", open=True):
+    with gr.Accordion("🎛️ Agent Action Space & Environment Disturbances", open=True):
         with gr.Row():
-            with gr.Column():
-                gr.Markdown("**Agent Action Space**")
-                irrigation_slider = gr.Slider(0.0, 1.0, 0.5, step=0.05, label="Irrigation Flow Rate")
-                temp_slider = gr.Slider(15.0, 35.0, 24.0, step=0.5, label="Target Internal Temp (°C)")
-            with gr.Column():
-                gr.Markdown("**External Disturbances**")
-                ext_temp_slider = gr.Slider(5.0, 45.0, 22.0, step=1.0, label="External Weather Temp (°C)")
+            with gr.Column(scale=1):
+                gr.Markdown("**🤖 RL Agent Controls**")
+                irrigation_slider = gr.Slider(0.0, 1.0, 0.3, step=0.05, label="Irrigation Flow")
+                temp_slider = gr.Slider(15.0, 35.0, 24.0, step=0.5, label="Target Temp (°C)")
+                hum_slider = gr.Slider(30.0, 90.0, 60.0, step=1.0, label="Target Humidity (%)")
+            with gr.Column(scale=1):
+                gr.Markdown("**🌤️ External Disturbances**")
+                ext_temp_slider = gr.Slider(5.0, 45.0, 22.0, step=1.0, label="External Temp (°C)")
+                solar_slider = gr.Slider(0.0, 1000.0, 600.0, step=10.0, label="Solar Radiation (W/m²)")
         
         with gr.Row():
-            step_btn = gr.Button("▶ Execute Single Step", variant="primary")
-            batch_btn = gr.Button("⏩ Batch Simulate (5 Steps)", variant="primary")
-            reset_btn = gr.Button("🔄 Reset System", variant="secondary")
+            step_btn = gr.Button("▶ Single Step", variant="primary")
+            batch_btn = gr.Button("⏩ Batch Simulate (6 Steps)", variant="primary")
+            reset_btn = gr.Button("🔄 Reset", variant="secondary")
 
     with gr.Tabs():
-        with gr.Tab("📈 Live Telemetry Graphs"):
+        with gr.Tab("📊 Command Center Graphs"):
             with gr.Row():
-                temp_plot = gr.LinePlot(x="Time", y="Actual Temp (°C)", title="Internal Atmospheric Temperature")
+                temp_plot = gr.LinePlot(x="Time", y="Actual T (°C)", title="Atmospheric Temperature")
+                vpd_plot = gr.LinePlot(x="Time", y="VPD (kPa)", title="Vapor Pressure Deficit (VPD)")
+            with gr.Row():
                 moist_plot = gr.LinePlot(x="Time", y="Moisture (%)", title="Soil Moisture Content")
+                biomass_plot = gr.LinePlot(x="Time", y="Biomass (g)", title="Cumulative Crop Biomass Yield")
         
-        with gr.Tab("🗄️ Tabular Data Matrix"):
+        with gr.Tab("🗄️ Database Matrix"):
             telemetry_table = gr.Dataframe(interactive=False)
         
-        with gr.Tab("🧩 Raw JSON & ML Diagnostics"):
+        with gr.Tab("🧩 Internal State (JSON)"):
             json_output = gr.JSON()
 
-    step_btn.click(
-        simulate_single, 
-        [irrigation_slider, temp_slider, ext_temp_slider, session_history],
-        [session_history, telemetry_table, temp_plot, moist_plot, json_output, sys_status]
-    )
+    # Event Mapping
+    inputs = [irrigation_slider, temp_slider, hum_slider, ext_temp_slider, solar_slider, session_history]
+    outputs = [session_history, telemetry_table, temp_plot, vpd_plot, moist_plot, biomass_plot, json_output, sys_status]
     
-    batch_btn.click(
-        batch_simulate, 
-        [irrigation_slider, temp_slider, ext_temp_slider, session_history],
-        [session_history, telemetry_table, temp_plot, moist_plot, json_output, sys_status]
-    )
-    
-    reset_btn.click(
-        reset_simulation, 
-        [],
-        [session_history, telemetry_table, temp_plot, moist_plot, json_output, sys_status]
-    )
+    step_btn.click(simulate_single, inputs, outputs)
+    batch_btn.click(batch_simulate, inputs, outputs)
+    reset_btn.click(reset_simulation, [], outputs)
 
 app = gr.mount_gradio_app(app, demo, path="/")
