@@ -33,7 +33,6 @@ def get_empty_df():
     ])
 
 def reset_simulation():
-    # Returns empty state and clears all UI components
     empty_df = get_empty_df()
     return [], empty_df, empty_df, "{}", "System Reset. Awaiting Initialization..."
 
@@ -45,7 +44,7 @@ def simulate_step(irrigation, target_temp, history):
     soil_moisture = 20 + (irrigation * 70) + (random.random() * 5 - 2.5)
     energy_used = abs(24.0 - target_temp) * 1.5 + (irrigation * 2.0) + random.uniform(0.1, 0.5)
     
-    # ML Anomaly Detection Mock (Spikes if parameters are extreme)
+    # ML Anomaly Detection Mock
     anomaly_risk = random.uniform(0.01, 0.05) if 18 <= target_temp <= 28 else random.uniform(0.6, 0.9)
     
     status = "Optimal" if 20 <= actual_temp <= 28 and anomaly_risk < 0.5 else "Warning: Suboptimal Climate / High Anomaly Risk"
@@ -80,8 +79,8 @@ def simulate_step(irrigation, target_temp, history):
     
     return history, df, df, json_state, status
 
-# Build the UI
-with gr.Blocks(theme=gr.themes.Soft(primary_hue="emerald", secondary_hue="zinc")) as demo:
+# Build the UI (Removed theme arg to fix the warning)
+with gr.Blocks() as demo:
     session_history = gr.State([])
     
     gr.Markdown("# 🌿 OpenEnv: Smart Greenhouse Digital Twin")
@@ -106,8 +105,9 @@ with gr.Blocks(theme=gr.themes.Soft(primary_hue="emerald", secondary_hue="zinc")
             with gr.Tabs():
                 with gr.Tab("📈 Live Telemetry Graphs"):
                     gr.Markdown("Real-time environmental response tracking.")
-                    temp_plot = gr.LinePlot(x="Time", y="Actual Temp (°C)", title="Atmospheric Temperature Over Time", width=600, height=250)
-                    moist_plot = gr.LinePlot(x="Time", y="Soil Moisture (%)", title="Soil Moisture Over Time", width=600, height=250)
+                    # Removed width and height parameters to fix the TypeError
+                    temp_plot = gr.LinePlot(x="Time", y="Actual Temp (°C)", title="Atmospheric Temperature Over Time")
+                    moist_plot = gr.LinePlot(x="Time", y="Soil Moisture (%)", title="Soil Moisture Over Time")
                 
                 with gr.Tab("🗄️ Tabular Data Matrix"):
                     telemetry_table = gr.Dataframe(headers=["Time", "Target Temp (°C)", "Actual Temp (°C)", "Irrigation Level", "Soil Moisture (%)", "Energy (kWh)", "Anomaly Score", "Reward"], interactive=False)
