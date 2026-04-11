@@ -33,7 +33,6 @@ def get_empty_df():
 
 def reset_simulation():
     empty_df = get_empty_df()
-    # Added the extra empty_df for the second plot!
     return [], empty_df, empty_df, empty_df, {}, "System Reset. Awaiting Initialization..."
 
 def simulate_step(irrigation, target_temp, history):
@@ -74,7 +73,6 @@ def simulate_step(irrigation, target_temp, history):
         "rl_metrics": {"step_reward": reward, "cumulative_status": status}
     }
     
-    # Return 'df' an extra time so both temp_plot AND moist_plot get data
     return history, df, df, df, json_state, status
 
 # Build the UI
@@ -84,10 +82,9 @@ with gr.Blocks() as demo:
     gr.Markdown("# 🌿 OpenEnv: Smart Greenhouse Digital Twin")
     gr.Markdown("### Interactive Reinforcement Learning Environment & Telemetry Dashboard")
     
-    # Wrap=True helps with responsiveness overall
-    with gr.Row(wrap=True):
+    # REMOVED wrap=True HERE:
+    with gr.Row():
         
-        # min_width ensures it doesn't squish too much before wrapping underneath
         with gr.Column(scale=1, min_width=320):
             gr.Markdown("### 🎛️ Agent Action Space")
             with gr.Group():
@@ -100,7 +97,6 @@ with gr.Blocks() as demo:
                 
             sys_status = gr.Textbox(label="Agent Environment Status", value="Awaiting Initialization...")
 
-        # min_width forces the graphs to stay readable
         with gr.Column(scale=2, min_width=500):
             with gr.Tabs():
                 with gr.Tab("📈 Live Telemetry Graphs"):
@@ -114,7 +110,7 @@ with gr.Blocks() as demo:
                 with gr.Tab("🧩 Raw JSON & ML Diagnostics"):
                     json_output = gr.JSON(label="OpenEnv Environment State Array")
 
-    # Linked BOTH plots into the outputs array!
+    # Event Listeners
     step_btn.click(
         fn=simulate_step,
         inputs=[irrigation_slider, temp_slider, session_history],
