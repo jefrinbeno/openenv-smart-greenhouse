@@ -13,7 +13,7 @@ pinned: false
 ![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
-## 🎥 [Click Here to Watch the 60-Second Demo Video](INSERT_YOUR_YOUTUBE_LINK_HERE)
+## 🎥 [Click Here to Watch the Full Interactive Demo Video](https://drive.google.com/file/d/1XiNI3r-6coFRMYNzRIeVCRkzONniqKjS/view?usp=sharing)
 
 ---
 
